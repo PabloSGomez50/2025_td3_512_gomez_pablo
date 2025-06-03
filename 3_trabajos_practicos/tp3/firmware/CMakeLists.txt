@@ -39,6 +39,9 @@ add_subdirectory(
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../lcd ${CMAKE_BINARY_DIR}/lcd
 )
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../helper ${CMAKE_BINARY_DIR}/helper
+)
 
 # Add executable. Default name is the project name, version 0.1
 
@@ -65,6 +68,7 @@ target_link_libraries(firmware
         hardware_i2c
         freertos
         lcd
+        helper
         )
 
 pico_add_extra_outputs(firmware)
