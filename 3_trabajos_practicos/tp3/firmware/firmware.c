@@ -20,9 +20,17 @@
 #define GPIO_PWM 12
 
 #define SAMPLE_MS 250
+#define __IRQ_READ_PULSE__ 1
 
 SemaphoreHandle_t semaphore_count;
 
+void read_pulse_irq(uint gpio, uint32_t event_mask) {
+    BaseType_t to_higher_priority = pdTRUE;
+    if (event_mask & GPIO_IRQ_EDGE_RISE) {
+        xSemaphoreGiveFromISR(semaphore_count, &to_higher_priority);
+        portYIELD_FROM_ISR(to_higher_priority);
+    }
+}
 
 /**
  * @brief Tarea de conteo de pulsos
@@ -46,8 +54,13 @@ void task_lcd_write(void *params) {
     char msg[MAX_CHARS] = {0};
     
     while(1) {
+        #ifdef __IRQ_READ_PULSE__
+        gpio_set_irq_enabled(GPIO_PULSE, GPIO_IRQ_EDGE_RISE, true);
         vTaskDelay(pdMS_TO_TICKS(SAMPLE_MS));
-
+        gpio_set_irq_enabled(GPIO_PULSE, GPIO_IRQ_EDGE_RISE, false);
+        #else
+        vTaskDelay(pdMS_TO_TICKS(SAMPLE_MS));
+        #endif
 
         uint32_t pulse_count = uxSemaphoreGetCount(semaphore_count);
         float freq_value = pulse_count * (1000 / (float) SAMPLE_MS);
@@ -78,6 +91,14 @@ int main()
     gpio_set_dir(GPIO_PULSE, GPIO_IN);
     gpio_pull_down(GPIO_PULSE);
 
+    #ifdef __IRQ_READ_PULSE__
+    gpio_set_irq_enabled_with_callback(GPIO_PULSE, 
+        GPIO_IRQ_EDGE_RISE, 
+        true, 
+        read_pulse_irq
+    );
+    #endif
+
 
     // Inicializacion del I2C. Freq 400Khz.
     i2c_init(I2C_PORT, 400*1000);
@@ -105,6 +126,7 @@ int main()
         tskIDLE_PRIORITY + 2,
         NULL
     );
+    #ifndef __IRQ_READ_PULSE__
     xTaskCreate(task_pulse_count,
         "task_pulse_count",
         configMINIMAL_STACK_SIZE * 2, 
@@ -112,6 +134,7 @@ int main()
         tskIDLE_PRIORITY + 1,
         NULL
     );
+    #endif
 
     // Arranca el scheduler
     vTaskStartScheduler();
