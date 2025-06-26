@@ -58,6 +58,7 @@ add_subdirectory(
 target_link_libraries(
     firmware
     pico_stdlib
+    hardware_pwm
     freertos
     lcd
     bmp280
