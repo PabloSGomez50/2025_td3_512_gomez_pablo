@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+#include "hardware/adc.h"
 #include "hardware/pwm.h"
 
 #include "FreeRTOS.h"
@@ -26,7 +27,7 @@
 #define MAX_MENU_NUM 2
 
 #define TEMP_THRESHOLD 100.0f
-#define Kp 50
+#define Kp 100
 #define CONTROLLER_REFRESH_MS 100
 #define MAX_PWM_DUTY 1024
 
@@ -39,12 +40,13 @@ SemaphoreHandle_t bin_btn_2;
 struct btn_data_t {
     uint8_t gpio;
     SemaphoreHandle_t *sem_bin;
-    uint8_t counter;
+    uint8_t * counter;
     uint8_t max_counter;
 };
 
 
-uint8_t menu_num = 0, num_index = 0;
+uint8_t menu_num = 0, index_num = 0;
+float resistance_target = 500.0f;
 
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(const char *line1, const char *line2);
@@ -61,25 +63,25 @@ void btn_irq_handler(uint gpio, uint32_t events) {
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void task_btn_handler(void *pvParameters) {
-    struct btn_data_t * btn_data = (struct btn_data_t *) pvParameters;
-    gpio_init(btn_data->gpio);
-    gpio_set_dir(btn_data->gpio, GPIO_IN);
-    gpio_pull_down(btn_data->gpio);
-    gpio_set_irq_enabled_with_callback(btn_data->gpio, GPIO_IRQ_EDGE_RISE, true, &btn_irq_handler);
-    gpio_set_irq_enabled_with_callback(btn_data->gpio, GPIO_IRQ_EDGE_FALL, false, &btn_irq_handler);
+void task_btn_pull_up(void *pvParameters) {
+    struct btn_data_t btn_data = *(struct btn_data_t *) pvParameters;
+    gpio_init(btn_data.gpio);
+    gpio_set_dir(btn_data.gpio, GPIO_IN);
+    gpio_pull_up(btn_data.gpio);
+    gpio_set_irq_enabled_with_callback(btn_data.gpio, GPIO_IRQ_EDGE_RISE, false, &btn_irq_handler);
+    gpio_set_irq_enabled_with_callback(btn_data.gpio, GPIO_IRQ_EDGE_FALL, true, &btn_irq_handler);
 
     while(1) {
-        xSemaphoreTake(*(btn_data->sem_bin), portMAX_DELAY);
-        btn_data->counter = (btn_data->counter + 1) % btn_data->max_counter;
-        vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME)); // Espera para evitar rebotes
+        xSemaphoreTake(*btn_data.sem_bin, portMAX_DELAY);
+        *btn_data.counter = (*btn_data.counter + 1) % btn_data.max_counter;
+        vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
 
-        if (gpio_get(btn_data->gpio)) {
-            gpio_set_irq_enabled(btn_data->gpio, GPIO_IRQ_EDGE_FALL, true);
-            xSemaphoreTake(*(btn_data->sem_bin), portMAX_DELAY); // Asegura que no se procese el evento de liberación del botón
-            vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME)); // Espera para evitar rebotes
+        if (!gpio_get(btn_data.gpio)) {
+            gpio_set_irq_enabled(btn_data.gpio, GPIO_IRQ_EDGE_RISE, true);
+            xSemaphoreTake(*btn_data.sem_bin, portMAX_DELAY);
+            vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
         }
-        gpio_set_irq_enabled(btn_data->gpio, GPIO_IRQ_EDGE_RISE, true);
+        gpio_set_irq_enabled(btn_data.gpio, GPIO_IRQ_EDGE_FALL, true);
     }
 }
 
@@ -90,7 +92,7 @@ void task_led_error(void *pvParameters) {
     // Configuración del PWM
     setup_pwm(LED_GPIO);
     while(1) {
-        int16_t duty = Kp;
+        int16_t duty = Kp * index_num;
 
         if (duty < 0) {
             duty *= -1;
@@ -115,7 +117,7 @@ void task_lcd_display(void *pvParameters) {
                 set_lcd_text("Menu Principal", "Presione Boton");
                 break;
             case 1:
-                snprintf(line2, MAX_CHARS, "El valor es: %d", num_index);
+                snprintf(line2, MAX_CHARS, "El valor es: %d", index_num);
                 set_lcd_text("Menu 1", line2);
                 break;
         }
@@ -123,6 +125,28 @@ void task_lcd_display(void *pvParameters) {
 
         vTaskDelay(pdMS_TO_TICKS(SLEEP_TIME_LCD));
     }
+}
+
+void task_read_adc(void *pvParameters) {
+    adc_init();
+    adc_gpio_init(26);
+    adc_gpio_init(27);
+    const float convert_factor = 3.3f / (1 << 12); // Factor de conversión para 12 bits
+    const float gain_current = 1 / (1 + 51.0f / 20.0f);
+    const float gain_voltage = (22.0f + 68.0f) / 22.0f;
+
+    while(1) {
+        adc_select_input(0);
+        float current_a = 10 * gain_current * (convert_factor * adc_read());
+
+        adc_select_input(1);
+        float vin_v = gain_voltage * (convert_factor * adc_read());
+
+        float resistance = vin_v / current_a;
+
+        float error = resistance_target - resistance;
+    }
+
 }
 
 int main()
@@ -135,14 +159,14 @@ int main()
     struct btn_data_t btn_data_1 = {
         .gpio = BTN_MENU_GPIO,
         .sem_bin = &bin_btn_1,
-        .counter = menu_num,
+        .counter = &menu_num,
         .max_counter = MAX_MENU_NUM
     };
     struct btn_data_t btn_data_2 = {
         .gpio = BTN_STOP_GPIO,
         .sem_bin = &bin_btn_2,
-        .counter = num_index,
-        .max_counter = 255
+        .counter = &index_num,
+        .max_counter = 11
     };
 
     // Inicializacion del I2C. Freq 400Khz.
@@ -154,8 +178,8 @@ int main()
 
     // Creacion de tareas
     xTaskCreate(task_led_error, "task_led_error", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
-    xTaskCreate(task_btn_handler, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 2, NULL);
-    xTaskCreate(task_btn_handler, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 2, NULL);
+    xTaskCreate(task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 2, NULL);
+    xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 2, NULL);
     xTaskCreate(task_lcd_display, "task_lcd_display", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
     vTaskStartScheduler();
@@ -177,7 +201,7 @@ void setup_pwm(uint8_t gpio) {
     gpio_set_function(gpio, GPIO_FUNC_PWM);
     // Configura frecuencia de PWM e inicializa
     uint32_t slice = pwm_gpio_to_slice_num(gpio);
-    pwm_set_clkdiv(slice, 140);
+    pwm_set_clkdiv(slice, 1.25);
     pwm_set_wrap(slice, MAX_PWM_DUTY);
     pwm_set_gpio_level(gpio, 0);
     pwm_set_enabled(slice, true);

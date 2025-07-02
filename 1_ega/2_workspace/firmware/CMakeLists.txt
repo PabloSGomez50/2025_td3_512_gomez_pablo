@@ -55,6 +55,7 @@ add_subdirectory(
 target_link_libraries(
     firmware
     pico_stdlib
+    hardware_adc
     hardware_pwm
     freertos
     lcd
