@@ -166,7 +166,7 @@ int main()
         .gpio = BTN_STOP_GPIO,
         .sem_bin = &bin_btn_2,
         .counter = &index_num,
-        .max_counter = 11
+        .max_counter = 12
     };
 
     // Inicializacion del I2C. Freq 400Khz.
