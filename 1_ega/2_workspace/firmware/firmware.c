@@ -22,7 +22,7 @@
 #define BTN_MENU_GPIO 14
 #define BTN_STOP_GPIO 13
 
-#define LED_GPIO 15
+#define PWM_PIN 15
 #define DEBOUNCE_TIME 70 // Tiempo de debounce en ms
 #define MAX_MENU_NUM 2
 
@@ -87,10 +87,10 @@ void task_btn_pull_up(void *pvParameters) {
 
 
 
-void task_led_error(void *pvParameters) {
+void task_error_controller(void *pvParameters) {
 
     // Configuración del PWM
-    setup_pwm(LED_GPIO);
+    setup_pwm(PWM_PIN);
     while(1) {
         int16_t duty = Kp * index_num;
 
@@ -100,7 +100,7 @@ void task_led_error(void *pvParameters) {
         if (duty > MAX_PWM_DUTY) {
             duty = MAX_PWM_DUTY; // Limita el duty cycle al máximo
         }
-        pwm_set_gpio_level(LED_GPIO, duty);
+        pwm_set_gpio_level(PWM_PIN, duty);
         vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS)); // Espera para evitar saturar el PWM
     }
 }
@@ -177,10 +177,11 @@ int main()
     gpio_pull_up(I2C_SCL);
 
     // Creacion de tareas
-    xTaskCreate(task_led_error, "task_led_error", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
+    xTaskCreate(task_error_controller, "task_error_controller", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 2, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 2, NULL);
     xTaskCreate(task_lcd_display, "task_lcd_display", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
+    xTaskCreate(task_read_adc, "task_read_adc", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
     vTaskStartScheduler();
     while(true);
@@ -201,7 +202,7 @@ void setup_pwm(uint8_t gpio) {
     gpio_set_function(gpio, GPIO_FUNC_PWM);
     // Configura frecuencia de PWM e inicializa
     uint32_t slice = pwm_gpio_to_slice_num(gpio);
-    pwm_set_clkdiv(slice, 1.25);
+    pwm_set_clkdiv(slice, 1.4648);
     pwm_set_wrap(slice, MAX_PWM_DUTY);
     pwm_set_gpio_level(gpio, 0);
     pwm_set_enabled(slice, true);
