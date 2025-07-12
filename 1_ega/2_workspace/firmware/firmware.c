@@ -10,6 +10,7 @@
 #include "semphr.h"
 
 #include "lcd.h"
+#include "ina219.h"
 
 // I2C definiciones
 #define I2C_PORT i2c0
@@ -27,11 +28,12 @@
 
 #define ENC_CHA_GPIO 2
 #define ENC_CHB_GPIO 3
-#define ENC_MAX_INDEX 45
+#define ENC_MAX_INDEX 100
 
 // Controlador PID y protecciones
 #define MAX_PWM_DUTY 1024
 #define PWM_PIN 15
+#define ADC_LM35_PORT 0 // Pin 26
 #define TEMP_THRESHOLD 100.0f
 #define Kp 15
 #define Kd 4
@@ -67,7 +69,7 @@ typedef struct encoder_t {
 } encoder_t;
 
 uint8_t menu_num = 0, start_num = 0;
-volatile uint8_t index_num = 0;
+uint8_t index_num = 0, index_max = ENC_MAX_INDEX;
 float resistance_target = 500.0f;
 
 void setup_pwm(uint8_t gpio);
@@ -96,6 +98,45 @@ void btn_irq_handler(uint gpio, uint32_t events) {
 }
 
 
+void task_ina219(void *pvParameters) {
+    ina219_t ina219 = ina219_get_default_config();
+    ina219.i2c = I2C_PORT;
+    ina219.sda_pin = I2C_SDA;
+    ina219.scl_pin = I2C_SCL;
+    
+    ina219_status_t status = ina219_init(ina219);
+    if (status != INA219_OK) {
+        printf("Error initializing INA219: %d\n", status);
+        vTaskDelete(NULL);
+    }
+    status = ina219_calibrate(ina219, 0.1f, 0.35f);
+    if (status != INA219_OK) {
+        printf("Error calibrating INA219: %d\n", status);
+        vTaskDelete(NULL);
+    }
+
+    float shunt_voltage, bus_voltage, current, power;
+    while(1) {
+        status = ina219_read_voltage(ina219, &bus_voltage);
+        if (status != INA219_OK) {
+            printf("Error reading bus voltage: %d\n", status);
+        }
+
+        status = ina219_read_current(ina219, &current);
+        if (status != INA219_OK) {
+            printf("Error reading current: %d\n", status);
+        }
+
+        status = ina219_read_power(ina219, &power);
+        if (status != INA219_OK) {
+            printf("Error reading power: %d\n", status);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Espera 1 segundo antes de la siguiente lectura
+    }
+}
+
+
 void task_encoder(void *pvParameters) {
     gpio_init(ENC_CHA_GPIO);
     gpio_set_dir(ENC_CHA_GPIO, GPIO_IN);
@@ -109,9 +150,8 @@ void task_encoder(void *pvParameters) {
     gpio_init(ENC_CHB_GPIO);
     gpio_set_dir(ENC_CHB_GPIO, GPIO_IN);
 
-    #define LED_PIN_CHA 12
-    #define LED_PIN_CHB 11
-
+    // #define LED_PIN_CHA 12
+    // #define LED_PIN_CHB 11
     // gpio_init(LED_PIN_CHA);
     // gpio_set_dir(LED_PIN_CHA, GPIO_OUT);
     // gpio_init(LED_PIN_CHB);
@@ -125,9 +165,9 @@ void task_encoder(void *pvParameters) {
         // gpio_put(LED_PIN_CHB, enc_status.chb);
 
         if (enc_status.cha != enc_status.chb)
-            index_num = (index_num + 1) % ENC_MAX_INDEX;
+            index_num = (index_num + 1) % index_max;
         else
-            index_num = (index_num + ENC_MAX_INDEX - 1) % ENC_MAX_INDEX;
+            index_num = (index_num + index_max - 1) % index_max;
         vTaskDelay(pdMS_TO_TICKS(10)); // Espera para evitar rebotes
     }
 }
@@ -156,9 +196,9 @@ void task_btn_pull_up(void *pvParameters) {
 }
 
 void task_enc_controller(void *pvParameters) {
-    // Esta tarea no se usa en este ejemplo, pero se puede implementar si se desea
+    
     while(1) {
-        vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME)); // Simula un delay
+        vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
     }
 }
 
@@ -219,30 +259,11 @@ void task_lcd_display(void *pvParameters) {
 
 
 void task_read_adc(void *pvParameters) {
-    adc_init();
-    adc_gpio_init(26);
-    adc_gpio_init(27);
     // adc_set_round_robin();
     const float convert_factor = 3.3f / (1 << 12); // Factor de conversión para 12 bits
-    // const float gain_current = 1 / (1 + 51.0f / 20.0f);
-    // const float gain_voltage = (22.0f + 68.0f) / 22.0f;
-    const float gain_current = 1.0f; // Ganancia de corriente
-    const float gain_voltage = 1.0f; // Ganancia de voltaje
-
-    struct adc_data_t adc_data = {
-        .current_ma = 0.0f,
-        .vin_v = 0.0f
-    };
-    vTaskSuspend(NULL);
 
     while(1) {
-        adc_select_input(0);
-        adc_data.current_ma = gain_current * (convert_factor * adc_read());
-        
-        adc_select_input(1);
-        adc_data.vin_v = gain_voltage * (convert_factor * adc_read());
 
-        xQueueSend(queue_adc_data, &adc_data, portMAX_DELAY);
     }
 
 }
@@ -285,6 +306,10 @@ int main()
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
+
+    // Configuracion de ADC
+    adc_init();
+    adc_gpio_init(26 + ADC_LM35_PORT);
 
     // Creacion de tareas
     // xTaskCreate(task_error_controller, "task_error_controller", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
