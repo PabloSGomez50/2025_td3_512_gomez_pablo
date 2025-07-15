@@ -27,9 +27,9 @@ ina219_status_t ina219_init(ina219_t ina219) {
     return status;
 }
 
-ina219_status_t ina219_calibrate(ina219_t ina219, float shunt_resistor_value, float max_expected_amps) {
-    ina219._current_lsb = max_expected_amps / 32768.0;
-    uint16_t cal_reg_value = (uint16_t)(0.04096 / (ina219._current_lsb * shunt_resistor_value));
+ina219_status_t ina219_calibrate(ina219_t ina219) {
+    ina219._current_lsb = ina219._max_expected_amps / 32768.0;
+    uint16_t cal_reg_value = (uint16_t)(0.04096 / (ina219._current_lsb * ina219._shunt_resistor_value));
     return write_register(ina219, INA219_REG_CALIBRATION, cal_reg_value);
 }
 
@@ -59,4 +59,47 @@ ina219_status_t ina219_read_power(ina219_t ina219, float *power) {
     ina219_status_t status = read_register(ina219, INA219_REG_POWER, &value);
     *power = value * 0.02;
     return status;
+}
+
+void ina219_get_data(void* ina219_ptr) {
+    ina219_t ina219 = *(ina219_t *) ina219_ptr;
+    ina219_data_t data;
+    ina219_status_t status;
+
+    status = ina219_read_voltage(ina219, &data.voltage_v);
+    if (status != INA219_OK) {
+        data.voltage_v = -1.0f;
+    }
+
+    status = ina219_read_current(ina219, &data.current_a);
+    if (status != INA219_OK) {
+        data.current_a = -1.0f;
+    }
+
+    status = ina219_read_power(ina219, &data.power_w);
+    if (status != INA219_OK) {
+        data.power_w = -1.0f;
+    }
+    printf("INA219 Data: Voltage: %.2f V, Current: %.2f A, Power: %.2f W\n", 
+           data.voltage_v, data.current_a, data.power_w);
+    // return data;
+}
+
+void ina219_init_and_calibrate(void * ina219_ptr) {
+    ina219_t *ina219 = (ina219_t *) ina219_ptr;
+    ina219_status_t status;
+
+    status = ina219_init(*ina219);
+    if (status != INA219_OK) {
+        printf("Error initializing INA219\n");
+        return;
+    }
+
+    status = ina219_calibrate(*ina219);
+    if (status != INA219_OK) {
+        printf("Error calibrating INA219\n");
+        return;
+    }
+
+    printf("INA219 initialized and calibrated successfully\n");
 }

@@ -28,8 +28,15 @@ typedef struct {
     uint8_t scl_pin;
     uint32_t clock;
     float _current_lsb;
+    float _shunt_resistor_value;
+    float _max_expected_amps;
 } ina219_t;
 
+typedef struct {
+    float voltage_v;
+    float current_a;
+    float power_w;
+} ina219_data_t;
 
 // Prototipos
 
@@ -39,15 +46,20 @@ static inline ina219_t ina219_get_default_config(void) {
         .addr = INA219_I2C_ADDR,
         .sda_pin = PICO_DEFAULT_I2C_SDA_PIN,
         .scl_pin = PICO_DEFAULT_I2C_SCL_PIN,
-        .clock = 400000
+        .clock = 400000,
+        ._max_expected_amps = 0.35f,
+        ._shunt_resistor_value = 0.1f,
     };
 }
 
 ina219_status_t ina219_init(ina219_t ina219);
-ina219_status_t ina219_calibrate(ina219_t ina219, float shunt_resistor_value, float max_expected_amps);
+ina219_status_t ina219_calibrate(ina219_t ina219);
 ina219_status_t ina219_read_voltage(ina219_t ina219, float *voltage);
 ina219_status_t ina219_read_shunt_voltage(ina219_t ina219, float *shunt_voltage);
 ina219_status_t ina219_read_current(ina219_t ina219, float *current);
 ina219_status_t ina219_read_power(ina219_t ina219, float *power);
+
+void ina219_init_and_calibrate(void * ina219_ptr);
+void ina219_get_data(void * ina219);
 
 #endif // INA219_H
