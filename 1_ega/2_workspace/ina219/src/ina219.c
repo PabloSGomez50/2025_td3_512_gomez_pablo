@@ -61,28 +61,30 @@ ina219_status_t ina219_read_power(ina219_t ina219, float *power) {
     return status;
 }
 
-void ina219_get_data(void* ina219_ptr) {
-    ina219_t ina219 = *(ina219_t *) ina219_ptr;
-    ina219_data_t data;
+
+void ina219_get_data(void* param_ptr) {
+    ina219_context_t *context = (ina219_context_t *) param_ptr;
+
+    ina219_t ina219 = context->ina219;
+    ina219_data_t *data = context->data;
     ina219_status_t status;
 
-    status = ina219_read_voltage(ina219, &data.voltage_v);
+    status = ina219_read_voltage(ina219, &data->voltage_v);
     if (status != INA219_OK) {
-        data.voltage_v = -1.0f;
+        data->voltage_v = -1.0f;
     }
 
-    status = ina219_read_current(ina219, &data.current_a);
+    status = ina219_read_current(ina219, &data->current_a);
     if (status != INA219_OK) {
-        data.current_a = -1.0f;
+        data->current_a = -1.0f;
     }
 
-    status = ina219_read_power(ina219, &data.power_w);
+    status = ina219_read_power(ina219, &data->power_w);
     if (status != INA219_OK) {
-        data.power_w = -1.0f;
+        data->power_w = -1.0f;
     }
     printf("INA219 Data: Voltage: %.2f V, Current: %.2f A, Power: %.2f W\n", 
-           data.voltage_v, data.current_a, data.power_w);
-    // return data;
+           data->voltage_v, data->current_a, data->power_w);
 }
 
 void ina219_init_and_calibrate(void * ina219_ptr) {

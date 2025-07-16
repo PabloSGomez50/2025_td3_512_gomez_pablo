@@ -24,9 +24,6 @@ typedef enum {
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;
-    uint8_t sda_pin;
-    uint8_t scl_pin;
-    uint32_t clock;
     float _current_lsb;
     float _shunt_resistor_value;
     float _max_expected_amps;
@@ -38,16 +35,18 @@ typedef struct {
     float power_w;
 } ina219_data_t;
 
+typedef struct {
+    ina219_data_t *data;
+    ina219_t ina219;
+} ina219_context_t;
+
 // Prototipos
 
 static inline ina219_t ina219_get_default_config(void) {
     return (ina219_t) {
         .i2c = i2c0,
         .addr = INA219_I2C_ADDR,
-        .sda_pin = PICO_DEFAULT_I2C_SDA_PIN,
-        .scl_pin = PICO_DEFAULT_I2C_SCL_PIN,
-        .clock = 400000,
-        ._max_expected_amps = 0.35f,
+        ._max_expected_amps = 4.0f,
         ._shunt_resistor_value = 0.1f,
     };
 }
