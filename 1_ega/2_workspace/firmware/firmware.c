@@ -56,7 +56,6 @@ void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
 
 // Mutex para sincronizacion de tareas
-SemaphoreHandle_t mutex_i2c;
 SemaphoreHandle_t bin_btn_1;
 SemaphoreHandle_t bin_btn_2;
 
@@ -153,9 +152,9 @@ void task_ina219(void *pvParameters) {
         portMAX_DELAY
     );
 
+    guard_data.callback = ina219_get_data;
+    guard_data.queue = queue_ina219_data;
     while(1) {
-        guard_data.callback = ina219_get_data;
-        guard_data.queue = queue_ina219_data;
         xQueueSend(
             queue_i2c_guard,
             &guard_data,
@@ -249,8 +248,8 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line2, MAX_CHARS, "INA219");
                     break;
                 }
-                snprintf(line2, MAX_CHARS, "El valor es: %d", start_num);
                 snprintf(line1, MAX_CHARS, "Tension: %.2f V", ina219_data.voltage_v);
+                snprintf(line2, MAX_CHARS, "El valor es: %d", start_num);
                 
                 break;
         }
@@ -296,7 +295,6 @@ int main()
         return -1;
     }
 
-    mutex_i2c = xSemaphoreCreateMutex();
     bin_btn_1 = xSemaphoreCreateBinary();
     bin_btn_2 = xSemaphoreCreateBinary();
     
@@ -323,10 +321,10 @@ int main()
     // Creacion de tareas
     xTaskCreate(task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 1, NULL, 3, NULL);
     xTaskCreate(task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 4, NULL, 3, NULL);
+    xTaskCreate(task_ina219, "task_ina219", configMINIMAL_STACK_SIZE * 3, NULL, 2, NULL);
     xTaskCreate(task_encoder, "task_encoder", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 1, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 1, NULL);
-    xTaskCreate(task_ina219, "task_ina219", configMINIMAL_STACK_SIZE * 3, NULL, 3, NULL);
     xTaskCreate(task_lcd_display, "task_lcd_display", configMINIMAL_STACK_SIZE * 2, NULL, 2, NULL);
     // xTaskCreate(task_read_temp, "task_read_temp", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
