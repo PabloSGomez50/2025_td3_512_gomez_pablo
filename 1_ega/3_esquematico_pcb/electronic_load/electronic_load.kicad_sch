@@ -626,6 +626,251 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Connector:Conn_01x04_Pin"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "J"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x04_Pin"
+				(at 0 -7.62 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x04, script generated"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_locked" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "Conn_01x04_Pin_1_1"
+				(rectangle
+					(start 0.8636 2.667)
+					(end 0 2.413)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 -2.413)
+					(end 0 -2.667)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start 0.8636 -4.953)
+					(end 0 -5.207)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 2.54) (xy 0.8636 2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 0) (xy 0.8636 0)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 -2.54) (xy 0.8636 -2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 -5.08) (xy 0.8636 -5.08)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at 5.08 2.54 180)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 0 180)
+					(length 3.81)
+					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -2.54 180)
+					(length 3.81)
+					(name "Pin_3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 -5.08 180)
+					(length 3.81)
+					(name "Pin_4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Connector:Conn_01x05_Pin"
 			(pin_names
 				(offset 1.016)
@@ -3559,6 +3804,105 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Mechanical:Heatsink"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim yes)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "HS"
+				(at 0 5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Heatsink"
+				(at 0 -1.27 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0.3048 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0.3048 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Heatsink"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "thermal heat temperature"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "Heatsink_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "Heatsink_0_1"
+				(polyline
+					(pts
+						(xy -0.3302 1.27) (xy -0.9652 1.27) (xy -0.9652 3.81) (xy -1.6002 3.81) (xy -1.6002 1.27) (xy -2.2352 1.27)
+						(xy -2.2352 3.81) (xy -2.8702 3.81) (xy -2.8702 0) (xy -0.9652 0)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(polyline
+					(pts
+						(xy -0.3302 1.27) (xy -0.3302 3.81) (xy 0.3048 3.81) (xy 0.3048 1.27) (xy 0.9398 1.27) (xy 0.9398 3.81)
+						(xy 1.5748 3.81) (xy 1.5748 1.27) (xy 2.2098 1.27) (xy 2.2098 3.81) (xy 2.8448 3.81) (xy 2.8448 0)
+						(xy -0.9652 0)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Regulator_Switching:MC34063AD"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -5410,10 +5754,6 @@
 		(uuid "ff03248c-43d7-4bb0-aab8-2de90790e12a")
 	)
 	(no_connect
-		(at 78.74 57.15)
-		(uuid "1055d720-4132-4fe2-a3ee-de26b873665e")
-	)
-	(no_connect
 		(at 78.74 74.93)
 		(uuid "1e5ef227-10e1-4233-8616-4b741f5ffe4a")
 	)
@@ -5422,7 +5762,7 @@
 		(uuid "3c4214fa-b865-46fa-9eeb-a8d886b55cbf")
 	)
 	(no_connect
-		(at 27.94 82.55)
+		(at 78.74 62.23)
 		(uuid "3dc8c139-7734-4651-aa5d-e1107bc64e5d")
 	)
 	(no_connect
@@ -5430,7 +5770,7 @@
 		(uuid "4858c0c6-188b-469c-8fe8-c3f2124b1849")
 	)
 	(no_connect
-		(at 78.74 77.47)
+		(at 78.74 49.53)
 		(uuid "4f5e2f80-28e5-45ef-a687-7689b8dd0062")
 	)
 	(no_connect
@@ -5438,7 +5778,7 @@
 		(uuid "8c10eedf-77e8-4db0-b5b7-6d7251504ac9")
 	)
 	(no_connect
-		(at 78.74 59.69)
+		(at 78.74 77.47)
 		(uuid "a8c7e706-5458-4faf-8763-33610e483671")
 	)
 	(no_connect
@@ -5448,10 +5788,6 @@
 	(no_connect
 		(at 27.94 39.37)
 		(uuid "bdb530e9-a6f8-4dd9-bb23-1d0ee7436498")
-	)
-	(no_connect
-		(at 78.74 54.61)
-		(uuid "ce594bae-dd37-451e-ae37-4fcd3de43744")
 	)
 	(no_connect
 		(at 78.74 82.55)
@@ -5593,7 +5929,7 @@
 	)
 	(wire
 		(pts
-			(xy 135.89 22.86) (xy 139.7 22.86)
+			(xy 134.62 26.67) (xy 138.43 26.67)
 		)
 		(stroke
 			(width 0)
@@ -5673,7 +6009,7 @@
 	)
 	(wire
 		(pts
-			(xy 135.89 25.4) (xy 139.7 25.4)
+			(xy 134.62 29.21) (xy 138.43 29.21)
 		)
 		(stroke
 			(width 0)
@@ -6253,7 +6589,7 @@
 	)
 	(wire
 		(pts
-			(xy 137.16 36.83) (xy 135.89 36.83)
+			(xy 135.89 34.29) (xy 134.62 34.29)
 		)
 		(stroke
 			(width 0)
@@ -7073,7 +7409,7 @@
 	)
 	(wire
 		(pts
-			(xy 135.89 34.29) (xy 139.7 34.29)
+			(xy 134.62 31.75) (xy 138.43 31.75)
 		)
 		(stroke
 			(width 0)
@@ -7173,7 +7509,7 @@
 	)
 	(wire
 		(pts
-			(xy 137.16 38.1) (xy 137.16 36.83)
+			(xy 135.89 35.56) (xy 135.89 34.29)
 		)
 		(stroke
 			(width 0)
@@ -7889,7 +8225,7 @@
 	)
 	(global_label "I2C_SDA"
 		(shape input)
-		(at 78.74 46.99 0)
+		(at 78.74 52.07 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7899,7 +8235,7 @@
 		)
 		(uuid "326656e3-2378-469e-b36a-83514d41ab71")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 89.3452 46.99 0)
+			(at 89.3452 52.07 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7977,7 +8313,7 @@
 	)
 	(global_label "I2C_SCL"
 		(shape input)
-		(at 78.74 49.53 0)
+		(at 78.74 54.61 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7987,7 +8323,7 @@
 		)
 		(uuid "4a666b28-a222-4e3a-bbfd-0fe3e8bb6a7b")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 89.2847 49.53 0)
+			(at 89.2847 54.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8021,7 +8357,7 @@
 	)
 	(global_label "MOS_PWM"
 		(shape input)
-		(at 78.74 52.07 0)
+		(at 78.74 46.99 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8031,7 +8367,7 @@
 		)
 		(uuid "67c1f1b5-0a72-49b7-bea0-e39fba991eaf")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 90.857 52.07 0)
+			(at 90.857 46.99 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8131,7 +8467,7 @@
 	)
 	(global_label "I2C_SCL"
 		(shape input)
-		(at 139.7 22.86 0)
+		(at 138.43 26.67 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8141,7 +8477,7 @@
 		)
 		(uuid "847aeb2e-96bf-497a-bdc7-37d7ef1dd96d")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 150.2447 22.86 0)
+			(at 148.9747 26.67 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8483,22 +8819,22 @@
 	)
 	(global_label "LED_ACTIVE"
 		(shape input)
-		(at 78.74 62.23 0)
+		(at 27.94 82.55 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify left)
+			(justify right)
 		)
 		(uuid "b933f58c-c842-4040-b71b-7b7f59de8dbd")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 92.3085 62.23 0)
+			(at 14.3715 82.55 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -8582,6 +8918,28 @@
 		(uuid "cdfd4839-97ee-4be9-ae36-dde9259730b3")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 93.1551 72.39 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "RTC_32K"
+		(shape input)
+		(at 78.74 59.69 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "d1c846c6-d9bb-4357-aedb-3678dba5b883")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 89.8894 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8681,7 +9039,7 @@
 	)
 	(global_label "I2C_SDA"
 		(shape input)
-		(at 139.7 25.4 0)
+		(at 138.43 29.21 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8691,7 +9049,7 @@
 		)
 		(uuid "daa9d332-7774-4942-8790-c0a8a88ab732")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 150.3052 25.4 0)
+			(at 149.0352 29.21 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8758,6 +9116,28 @@
 		(uuid "dcfeb3aa-09d3-4cfc-b92c-d22422c6c035")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 281.4781 20.32 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "RTC_SQW"
+		(shape input)
+		(at 78.74 57.15 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "dedf2c46-c18e-4ba9-a842-7a7d1e190833")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 90.1918 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9101,6 +9481,80 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:Conn_01x04_Pin")
+		(at 129.54 29.21 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "076ed7be-7d8e-4b65-94dc-00c15fddca1a")
+		(property "Reference" "J13"
+			(at 130.175 21.59 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "LCD"
+			(at 130.175 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-04A_1x04_P2.54mm_Vertical"
+			(at 129.54 29.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 129.54 29.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x04, script generated"
+			(at 129.54 29.21 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "9a9ea165-0d65-45ab-8c60-1d6a20dbc572")
+		)
+		(pin "1"
+			(uuid "d62d6ea6-e0e1-4c31-8f83-9c114ea0fc10")
+		)
+		(pin "4"
+			(uuid "ac211308-794d-4a9b-91a1-eda0352adba5")
+		)
+		(pin "3"
+			(uuid "3630a528-dcf7-4ff5-8d38-7886cd2792d3")
+		)
+		(instances
+			(project ""
+				(path "/81cd5d4b-9d20-44f7-96cd-6c36b0530d4f"
+					(reference "J13")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+3V3")
 		(at 58.42 20.32 0)
 		(unit 1)
@@ -9369,7 +9823,6 @@
 	(symbol
 		(lib_id "Switch:SW_Push")
 		(at 172.72 90.17 270)
-		(mirror x)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -9392,7 +9845,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+		(property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-02A_1x02_P2.54mm_Vertical"
 			(at 177.8 90.17 0)
 			(effects
 				(font
@@ -10885,73 +11338,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:Conn_01x02_Pin")
-		(at 130.81 22.86 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "472094df-6c6d-46aa-baad-faf63227cee3")
-		(property "Reference" "J16"
-			(at 133.604 17.018 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "LCD_I2C"
-			(at 133.604 19.558 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
-			(at 130.81 22.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 130.81 22.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated"
-			(at 130.81 22.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "92e07384-e436-424f-90b6-ba24616e43b7")
-		)
-		(pin "2"
-			(uuid "87023e57-daff-40c0-b1d8-b35c611c8b06")
-		)
-		(instances
-			(project "electronic_load"
-				(path "/81cd5d4b-9d20-44f7-96cd-6c36b0530d4f"
-					(reference "J16")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:C")
 		(at 166.37 90.17 180)
 		(unit 1)
@@ -11427,73 +11813,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:Conn_01x02_Pin")
-		(at 130.81 34.29 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "59519724-8100-40a2-bad7-98dda5f67ab1")
-		(property "Reference" "J6"
-			(at 133.604 28.448 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "LCD_PWR"
-			(at 133.604 30.988 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
-			(at 130.81 34.29 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 130.81 34.29 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated"
-			(at 130.81 34.29 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "3d636638-ba3b-48c4-acca-b561d18bdc51")
-		)
-		(pin "2"
-			(uuid "5b7df307-f5df-4873-93ce-35403087daea")
-		)
-		(instances
-			(project "electronic_load"
-				(path "/81cd5d4b-9d20-44f7-96cd-6c36b0530d4f"
-					(reference "J6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Connector:Conn_01x03_Pin")
 		(at 106.68 151.13 0)
 		(unit 1)
@@ -11566,7 +11885,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 139.7 34.29 270)
+		(at 138.43 31.75 270)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -11575,7 +11894,7 @@
 		(fields_autoplaced yes)
 		(uuid "5a701ae3-d146-4a1e-aa4d-f64fa7f90f50")
 		(property "Reference" "#PWR011"
-			(at 135.89 34.29 0)
+			(at 134.62 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11584,7 +11903,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 143.51 34.2899 90)
+			(at 142.24 31.7499 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11593,7 +11912,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 139.7 34.29 0)
+			(at 138.43 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11602,7 +11921,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 139.7 34.29 0)
+			(at 138.43 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11611,7 +11930,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 139.7 34.29 0)
+			(at 138.43 31.75 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11633,7 +11952,7 @@
 	)
 	(symbol
 		(lib_id "Amplifier_Operational:LM358")
-		(at 255.27 78.74 0)
+		(at 233.68 30.48 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -11642,7 +11961,7 @@
 		(fields_autoplaced yes)
 		(uuid "5a893abb-9102-48a8-8bd6-a39b9d8a473c")
 		(property "Reference" "U1"
-			(at 255.27 68.58 0)
+			(at 233.68 20.32 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11650,7 +11969,7 @@
 			)
 		)
 		(property "Value" "LM358"
-			(at 255.27 71.12 0)
+			(at 233.68 22.86 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11658,7 +11977,7 @@
 			)
 		)
 		(property "Footprint" "Package_DIP:DIP-8_W7.62mm_Socket_LongPads"
-			(at 255.27 78.74 0)
+			(at 233.68 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11667,7 +11986,7 @@
 			)
 		)
 		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/lm2904-n.pdf"
-			(at 255.27 78.74 0)
+			(at 233.68 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11676,7 +11995,7 @@
 			)
 		)
 		(property "Description" "Low-Power, Dual Operational Amplifiers, DIP-8/SOIC-8/TO-99-8"
-			(at 255.27 78.74 0)
+			(at 233.68 30.48 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13026,7 +13345,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Inductor_THT:L_Radial_D10.5mm_P5.00mm_Abacron_AISR-01"
+		(property "Footprint" "Inductor_THT:L_Radial_D7.5mm_P3.50mm_Fastron_07P"
 			(at 250.19 123.19 0)
 			(effects
 				(font
@@ -13566,7 +13885,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:CP_Radial_D6.3mm_P2.50mm"
+		(property "Footprint" "Capacitor_THT:CP_Radial_D10.0mm_P3.50mm"
 			(at 268.9352 146.05 0)
 			(effects
 				(font
@@ -13636,7 +13955,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D3.4mm_W2.1mm_P2.50mm"
+		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"
 			(at 214.9348 36.83 0)
 			(effects
 				(font
@@ -13877,7 +14196,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 137.16 38.1 0)
+		(at 135.89 35.56 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -13885,7 +14204,7 @@
 		(dnp no)
 		(uuid "a820c238-8f64-4835-aece-c523325f7655")
 		(property "Reference" "#PWR019"
-			(at 137.16 44.45 0)
+			(at 135.89 41.91 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13894,7 +14213,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 137.16 42.164 0)
+			(at 135.89 39.624 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13902,7 +14221,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 137.16 38.1 0)
+			(at 135.89 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13911,7 +14230,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 137.16 38.1 0)
+			(at 135.89 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -13920,7 +14239,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 137.16 38.1 0)
+			(at 135.89 35.56 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14210,8 +14529,72 @@
 		)
 	)
 	(symbol
+		(lib_id "Mechanical:Heatsink")
+		(at 265.43 48.26 180)
+		(unit 1)
+		(exclude_from_sim yes)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "afd310e5-fa61-4c85-a4e7-14a4571fdf97")
+		(property "Reference" "HS1"
+			(at 269.24 48.8949 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Heatsink"
+			(at 269.24 51.4349 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "electronic_load:Heatsink_2725D"
+			(at 265.1252 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 265.1252 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Heatsink"
+			(at 265.43 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(instances
+			(project ""
+				(path "/81cd5d4b-9d20-44f7-96cd-6c36b0530d4f"
+					(reference "HS1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Amplifier_Operational:LM358")
-		(at 233.68 30.48 0)
+		(at 255.27 78.74 0)
 		(unit 2)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -14220,7 +14603,7 @@
 		(fields_autoplaced yes)
 		(uuid "afdb4311-1f91-4429-b140-3c8340c50125")
 		(property "Reference" "U1"
-			(at 233.68 20.32 0)
+			(at 255.27 68.58 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14228,7 +14611,7 @@
 			)
 		)
 		(property "Value" "LM358"
-			(at 233.68 22.86 0)
+			(at 255.27 71.12 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14236,7 +14619,7 @@
 			)
 		)
 		(property "Footprint" "Package_DIP:DIP-8_W7.62mm_Socket_LongPads"
-			(at 233.68 30.48 0)
+			(at 255.27 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14245,7 +14628,7 @@
 			)
 		)
 		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/lm2904-n.pdf"
-			(at 233.68 30.48 0)
+			(at 255.27 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14254,7 +14637,7 @@
 			)
 		)
 		(property "Description" "Low-Power, Dual Operational Amplifiers, DIP-8/SOIC-8/TO-99-8"
-			(at 233.68 30.48 0)
+			(at 255.27 78.74 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -14457,7 +14840,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+		(property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-02A_1x02_P2.54mm_Vertical"
 			(at 153.67 90.17 0)
 			(effects
 				(font
@@ -15521,7 +15904,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_THT:C_Disc_D3.4mm_W2.1mm_P2.50mm"
+		(property "Footprint" "Capacitor_THT:C_Disc_D5.0mm_W2.5mm_P5.00mm"
 			(at 213.0552 140.97 0)
 			(effects
 				(font
