@@ -17,7 +17,8 @@
 #define TIMEOUT_US              10000
 
 typedef enum {
-    INA219_OK,
+    INA219_OK = 0,
+    INA219_ERROR = -1,
     INA219_TIMEOUT = -2
 } ina219_status_t;
 

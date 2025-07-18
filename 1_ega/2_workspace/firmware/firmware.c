@@ -130,7 +130,7 @@ void task_i2c_guard(void *pvParameters) {
 void task_ina219(void *pvParameters) {
     ina219_t ina219 = ina219_get_default_config();
     ina219.i2c = I2C_PORT;
-    ina219._max_expected_amps = 2.0f;
+    ina219._max_expected_amps = 0.3f;
     ina219._shunt_resistor_value = 0.1f;
 
     ina219_data_t ina219_data = {0};
@@ -248,9 +248,9 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line2, MAX_CHARS, "INA219");
                     break;
                 }
-                snprintf(line1, MAX_CHARS, "Tension: %.2f V", ina219_data.voltage_v);
-                snprintf(line2, MAX_CHARS, "El valor es: %d", start_num);
-                
+                snprintf(line1, MAX_CHARS, "Vmed: %.2f V", ina219_data.voltage_v);
+                snprintf(line2, MAX_CHARS, "Imed: %.2f A", ina219_data.current_a);
+
                 break;
         }
         xQueueSend(
@@ -312,7 +312,7 @@ int main()
     };
 
     // Inicializacion del I2C. Freq 400Khz.
-    i2c_init(I2C_PORT, 400*1000);
+    i2c_init(I2C_PORT, 100*1000);
     gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
