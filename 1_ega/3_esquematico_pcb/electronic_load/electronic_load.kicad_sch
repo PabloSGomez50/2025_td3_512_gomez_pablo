@@ -13336,7 +13336,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "170uH"
+		(property "Value" "220uH"
 			(at 252.73 124.4599 0)
 			(effects
 				(font
