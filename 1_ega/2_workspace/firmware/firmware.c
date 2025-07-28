@@ -14,33 +14,34 @@
 #include "ina219.h"
 
 // I2C definiciones
-#define I2C_PORT i2c0
-#define I2C_SDA 16
-#define I2C_SCL 17
+#define I2C_PORT i2c1
+#define I2C_SDA 18
+#define I2C_SCL 19
 #define LCD_ADDR 0x27
 
-#define SLEEP_TIME_LCD 500 // Tiempo de espera en ms para la LCD
+#define SLEEP_TIME_LCD 600 // Tiempo de espera en ms para la LCD
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
 #define BTN_MENU_GPIO 14
-#define BTN_STOP_GPIO 13
+#define BTN_STOP_GPIO 15
+#define BTN_SWITCH_GPIO 13
 #define MAX_MENU_NUM 2
 
-#define ENC_CHA_GPIO 2
-#define ENC_CHB_GPIO 3
-#define ENC_MAX_INDEX 100
+#define ENC_CHA_GPIO 11
+#define ENC_CHB_GPIO 12
+#define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
 #define MAX_PWM_DUTY 1024
-#define PWM_PIN 15
+#define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
-#define TEMP_THRESHOLD 100.0f
+#define TEMP_THRESHOLD 130.0f
 #define Kp 15
 #define Kd 4
 #define Ki 3.5
 #define MAX_INTEGRAL_VALUE 1000.0f
-#define CONTROLLER_REFRESH_MS 5
+#define CONTROLLER_REFRESH_MS 10
 
 #define MINIMUM_RESISTANCE 2.0f
 
@@ -48,8 +49,9 @@ void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);
 void task_btn_pull_up(void *pvParameters);
 
-uint8_t menu_num = 0, start_num = 0;
+uint8_t menu_num = 0, start_num = 0, test_num = 0;
 uint8_t index_num = 0, index_max = ENC_MAX_INDEX;
+
 float resistance_target = 500.0f;
 
 void setup_pwm(uint8_t gpio);
@@ -58,7 +60,7 @@ void set_lcd_text(void *text);
 // Mutex para sincronizacion de tareas
 SemaphoreHandle_t bin_btn_1;
 SemaphoreHandle_t bin_btn_2;
-
+SemaphoreHandle_t bin_btn_3;
 QueueHandle_t queue_encoder;
 QueueHandle_t queue_ina219_data;
 QueueHandle_t queue_i2c_guard;
@@ -130,7 +132,7 @@ void task_i2c_guard(void *pvParameters) {
 void task_ina219(void *pvParameters) {
     ina219_t ina219 = ina219_get_default_config();
     ina219.i2c = I2C_PORT;
-    ina219._max_expected_amps = 0.3f;
+    ina219._max_expected_amps = 0.5f;
     ina219._shunt_resistor_value = 0.1f;
 
     ina219_data_t ina219_data = {0};
@@ -222,7 +224,7 @@ void task_lcd_display(void *pvParameters) {
     // Inicializacion del LCD
     lcd_init(I2C_PORT, LCD_ADDR);
     char line1[MAX_CHARS * 2];
-    char * line2 = line1 + MAX_CHARS;
+    char *line2 = line1 + MAX_CHARS;
     i2c_guard_t guard_data = {
         .device = I2C_LCD,
         .queue = NULL,
@@ -238,7 +240,7 @@ void task_lcd_display(void *pvParameters) {
         switch(menu_num) {
             case 0:
                 snprintf(line1, MAX_CHARS, "|%c|R cte.", index_num == 0 ? 'X' : ' ');
-                snprintf(line2, MAX_CHARS, "|%c|Reg. %d", index_num == 1 ? 'X' : ' ', index_num);
+                snprintf(line2, MAX_CHARS, "|%c|Reg. %d", index_num == 1 ? 'X' : ' ', test_num);
 
                 break;
             case 1:
@@ -297,7 +299,8 @@ int main()
 
     bin_btn_1 = xSemaphoreCreateBinary();
     bin_btn_2 = xSemaphoreCreateBinary();
-    
+    bin_btn_3 = xSemaphoreCreateBinary();
+
     struct btn_data_t btn_data_1 = {
         .gpio = BTN_MENU_GPIO,
         .sem_bin = &bin_btn_1,
@@ -310,6 +313,12 @@ int main()
         .counter = &start_num,
         .max_counter = 12
     };
+    struct btn_data_t btn_data_3 = {
+        .gpio = BTN_SWITCH_GPIO,
+        .sem_bin = &bin_btn_3,
+        .counter = &test_num,
+        .max_counter = 10
+    };
 
     // Inicializacion del I2C. Freq 400Khz.
     i2c_init(I2C_PORT, 100*1000);
@@ -321,10 +330,11 @@ int main()
     // Creacion de tareas
     xTaskCreate(task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 1, NULL, 3, NULL);
     xTaskCreate(task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 4, NULL, 3, NULL);
+    xTaskCreate(task_encoder, "task_encoder", configMINIMAL_STACK_SIZE * 1, NULL, 3, NULL);
     xTaskCreate(task_ina219, "task_ina219", configMINIMAL_STACK_SIZE * 3, NULL, 2, NULL);
-    xTaskCreate(task_encoder, "task_encoder", configMINIMAL_STACK_SIZE * 1, NULL, 2, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 1, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 1, NULL);
+    xTaskCreate(task_btn_pull_up, "task_btn_clk", configMINIMAL_STACK_SIZE * 1, &btn_data_3, 1, NULL);
     xTaskCreate(task_lcd_display, "task_lcd_display", configMINIMAL_STACK_SIZE * 2, NULL, 2, NULL);
     // xTaskCreate(task_read_temp, "task_read_temp", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
@@ -373,6 +383,9 @@ void btn_irq_handler(uint gpio, uint32_t events) {
 
     gpio_set_irq_enabled(gpio, events, false);
 
+    if (gpio == BTN_SWITCH_GPIO) {
+        xSemaphoreGiveFromISR(bin_btn_3, &xHigherPriorityTaskWoken);
+    }
     if (gpio == BTN_MENU_GPIO) {
         xSemaphoreGiveFromISR(bin_btn_1, &xHigherPriorityTaskWoken);       
     }
@@ -403,7 +416,7 @@ void task_encoder(void *pvParameters) {
             index_num = (index_num + 1) % index_max;
         else
             index_num = (index_num + index_max - 1) % index_max;
-        vTaskDelay(pdMS_TO_TICKS(10)); // Espera para evitar rebotes
+        vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
     }
 }
 
