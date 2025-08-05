@@ -40,6 +40,8 @@
     "files.associations": {
         "*.mpy": "python",
         "ina219.h": "c",
-        "random": "c"
+        "random": "c",
+        "stdio.h": "c",
+        "freertos.h": "c"
     }
 }

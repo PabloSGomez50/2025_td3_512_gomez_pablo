@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(firmware firmware.c )
+add_executable(firmware firmware.c)
 
 pico_set_program_name(firmware "firmware")
 pico_set_program_version(firmware "0.1")
@@ -53,6 +53,9 @@ add_subdirectory(
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../ina219 ${CMAKE_BINARY_DIR}/ina219
 )
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../rtc_ds3231 ${CMAKE_BINARY_DIR}/rtc_ds3231
+)
 
 # Add the standard library to the build
 target_link_libraries(
@@ -63,6 +66,7 @@ target_link_libraries(
     freertos
     lcd
     ina219
+    rtc_ds3231
 )
 
 # Add the standard include files to the build
