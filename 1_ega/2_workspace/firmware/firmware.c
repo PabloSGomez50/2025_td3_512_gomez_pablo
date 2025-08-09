@@ -21,26 +21,23 @@ QueueHandle_t queue_encoder;
 QueueHandle_t queue_ina219_data;
 QueueHandle_t queue_i2c_guard;
 QueueHandle_t queue_input_data;
+QueueHandle_t queue_rtc_time;
+
+int16_t pwm_test_wrap = MIN_PWM_DUTY;
 
 system_config_t system_config = {
     .menu = 0,
     .pid_enabled = false,
     .resistance_target = 500.0f, // Valor inicial de resistencia objetivo
-    .pid_stable = false,
-    .ina219_data = {0}
+    .pid_stable = false
 };
 
 void task_main(void *pvParameters) {
     input_data_t input_data = {0};
-    ina219_data_t ina219_data = {0};
     static bool fixed_index = false;
 
     while(1) {
         xQueueReceive(queue_input_data, &input_data, portMAX_DELAY);
-        BaseType_t status = xQueueReceive(queue_ina219_data, &ina219_data, 1);
-        if (status == pdTRUE) {
-            system_config.ina219_data = ina219_data;
-        }
 
         if (input_data.device == BTN_STOP) {
             system_config.pid_enabled = !system_config.pid_enabled;
@@ -106,19 +103,31 @@ void task_main(void *pvParameters) {
             continue;
         }
 
-
+    
         if (system_config.menu == 3 || system_config.menu == 2) {
             if (input_data.device == BTN_SWITCH) {
                 system_config.menu = 0;
                 system_config.index = 0;
             }
-            continue;
         }
+
+        if (system_config.menu == 3) {
+            if (input_data.device == ENCODER) {
+                int16_t aux_wrap = (pwm_test_wrap + (input_data.increment ? 5 : -5));
+                if (aux_wrap > MAX_PWM_DUTY) {
+                    aux_wrap = MAX_PWM_DUTY;
+                }
+                if (aux_wrap < 0) {
+                    aux_wrap = 0;
+                }
+                pwm_test_wrap = aux_wrap;
+            }
+        }
+
     }
 }
 
 void task_pid_controller(void *pvParameters) {
-
     // Configuración del PWM
     setup_pwm(PWM_PIN);
     ina219_data_t ina219_data;
@@ -133,9 +142,17 @@ void task_pid_controller(void *pvParameters) {
     float integral_value = 0.0f;
 
     while(1) {
-        xQueueReceive(queue_ina219_data, &ina219_data, portMAX_DELAY);
+        if (system_config.pid_enabled && pwm_test_wrap > MIN_PWM_DUTY && pwm_test_wrap < MAX_PWM_DUTY) {
+            pwm_set_gpio_level(PWM_PIN, pwm_test_wrap);
+        } else {
+            pwm_set_gpio_level(PWM_PIN, 0);
+        }
 
-        system_config.ina219_data = ina219_data;
+        vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+    }
+
+    while(1) {
+        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
         
         if (ina219_data.current_a == 0.0f) {
             printf("Error: Current is zero, skipping PID calculation.\n");
@@ -146,7 +163,6 @@ void task_pid_controller(void *pvParameters) {
             resistance = MINIMUM_RESISTANCE;
         }
 
-        ticks = xTaskGetTickCount();
         elapsed_ticks = ticks - last_ticks;
         last_ticks = ticks;
 
@@ -163,7 +179,7 @@ void task_pid_controller(void *pvParameters) {
         int16_t duty = (int16_t) (Kp * error + Kd * (error - last_error) / elapsed_ticks + Ki * integral_value);
 
         if (duty < 0) {
-            duty *= -1;
+            duty = 0;
         }
         if (duty > MAX_PWM_DUTY) {
             duty = MAX_PWM_DUTY;
@@ -185,6 +201,7 @@ void task_lcd_display(void *pvParameters) {
         .callback = set_lcd_text,
         .param = (void *) line1
     };
+    ina219_data_t ina219_data;
 
     while(1) {
 
@@ -209,8 +226,14 @@ void task_lcd_display(void *pvParameters) {
 
                 break;
             case 3:
-                snprintf(line1, MAX_CHARS, "Vmed: %.2f V", system_config.ina219_data.voltage_v);
-                snprintf(line2, MAX_CHARS, "Imed: %.2f mA", system_config.ina219_data.current_a * 1000.0f);
+                BaseType_t status = xQueuePeek(queue_ina219_data, &ina219_data, 1);
+                if (status == pdFALSE) {
+                    snprintf(line1, MAX_CHARS, "Error: INA219");
+                    snprintf(line2, MAX_CHARS, "No data");
+                } else {
+                    snprintf(line1, MAX_CHARS, "I:%05.1fmA|W:%04d", ina219_data.current_a * 1000.0f, pwm_test_wrap);
+                    snprintf(line2, MAX_CHARS, "R:%05.1fohm|C:%s", ina219_data.voltage_v / ina219_data.current_a, system_config.pid_enabled ? "ON" : "OFF");
+                }
 
                 break;
         }
@@ -224,23 +247,73 @@ void task_lcd_display(void *pvParameters) {
     }
 }
 
+void task_rtc(void *pvParameters) {
+    rtc_init(I2C_PORT);
+    time_t current_time;
+    i2c_guard_t guard_data = {
+        .device = I2C_RTC,
+        .queue = queue_rtc_time,
+        .callback = rtc_get_time_guard,
+        .param = (void *) &current_time
+    };
+    while(1) {
+        xQueueSend(
+            queue_i2c_guard,
+            &guard_data,
+            portMAX_DELAY
+        );
+        vTaskDelay(pdMS_TO_TICKS(750));
+    }
+}
+
 void task_read_temp(void *pvParameters) {
     const float convert_factor = 3.3f / (1 << 12); // Factor de conversión para 12 bits
-
+    const float slope_temp = (0.6f - 0.245f) / (-20 - 140);
     // Configuracion de ADC
     adc_init();
     adc_gpio_init(26 + ADC_DIODE_TEMP);
-    // Amplificador de ganancia 4.7
+    
+    // Amplificador de ganancia 4.9
     while(1) {
-        float v_temp = adc_read() * convert_factor;
+        float v_temp = adc_read() * convert_factor / 4.9f;
+        float temp = (v_temp - 0.245f) / slope_temp;
     }
+}
+
+
+void task_datalogger(void *pvParameters) {
+    FATFS fs;
+    FRESULT f_res;
+    DIR dir;
+    FILINFO fno;
+    FIL fp;
+    bool sd_connected = false;
+
+    TickType_t ultimo_tick = xTaskGetTickCount();
+    
+    while(1) {
+        
+        if (!sd_connected) {
+            f_res = f_mount(&fs, "", 1);
+            if (f_res == FR_OK) {
+                sd_connected = true;
+            }
+        }
+
+        if (sd_connected) {
+
+        }
+        
+        xTaskDelayUntil(&ultimo_tick, pdMS_TO_TICKS(1000)); // Espera 1 segundo
+    }
+
 }
 
 int main()
 {
     stdio_init_all();
     // Inicializacion de Semaforo y Cola
-    queue_ina219_data = xQueueCreate(3, sizeof(ina219_data_t));
+    queue_ina219_data = xQueueCreate(1, sizeof(ina219_data_t));
     if (queue_ina219_data == NULL) {
         printf("Error al crear la cola de datos INA219\n");
         return -1;
@@ -268,26 +341,20 @@ int main()
     btn_data_t btn_data_1 = {
         .gpio = BTN_MENU_GPIO,
         .sem_bin = &bin_btn_1,
-        .device = BTN_MENU,
-        // .counter = &menu_num,
-        // .max_counter = MAX_MENU_NUM
+        .device = BTN_MENU
     };
     btn_data_t btn_data_2 = {
         .gpio = BTN_STOP_GPIO,
         .sem_bin = &bin_btn_2,
-        .device = BTN_STOP,
-        // .counter = &start_num,
-        // .max_counter = 12
+        .device = BTN_STOP
     };
     btn_data_t btn_data_3 = {
         .gpio = BTN_SWITCH_GPIO,
         .sem_bin = &bin_btn_3,
-        .device = BTN_SWITCH,
-        // .counter = &test_num,
-        // .max_counter = 10
+        .device = BTN_SWITCH
     };
 
-    // Inicializacion del I2C. Freq 400Khz.
+    // Inicializacion del I2C.
     i2c_init(I2C_PORT, 100*1000);
     gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
@@ -296,13 +363,13 @@ int main()
 
     // Creacion de tareas
     xTaskCreate(task_main, "task_main", configMINIMAL_STACK_SIZE * 4, NULL, 2, NULL);
+    xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 3, NULL);
     xTaskCreate(task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 1, NULL, 3, NULL);
     xTaskCreate(task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 4, NULL, 3, NULL);
     xTaskCreate(task_encoder, "task_encoder", configMINIMAL_STACK_SIZE * 1, NULL, 3, NULL);
     xTaskCreate(task_lcd_display, "task_lcd_display", configMINIMAL_STACK_SIZE * 3, NULL, 2, NULL);
     xTaskCreate(task_ina219, "task_ina219", configMINIMAL_STACK_SIZE * 3, NULL, 2, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1, &btn_data_1, 1, NULL);
-    xTaskCreate(task_btn_pull_up, "task_btn_stop", configMINIMAL_STACK_SIZE * 1, &btn_data_2, 1, NULL);
     xTaskCreate(task_btn_pull_up, "task_btn_clk", configMINIMAL_STACK_SIZE * 1, &btn_data_3, 1, NULL);
     // xTaskCreate(task_read_temp, "task_read_temp", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
@@ -310,13 +377,24 @@ int main()
     while(true);
 }
 
+void pad_line(char *dest, const char *src, size_t len) {
+    size_t i = 0;
+    for (; i < len - 1 && src[i] != '\0'; ++i) {
+        dest[i] = src[i];
+    }
+    for (; i < len - 1; ++i) {
+        dest[i] = ' ';
+    }
+    dest[len - 1] = '\0'; // Ensure null-termination
+}
+
 void set_lcd_text(void *str) {
     char *text = (char *) str;
-    char line1[MAX_CHARS], line2[MAX_CHARS];
-    strncpy(line1, text, MAX_CHARS);
-    strncpy(line2, text + MAX_CHARS, MAX_CHARS);
+    char line1[MAX_CHARS + 1], line2[MAX_CHARS + 1];
+    pad_line(line1, text, MAX_CHARS + 1);
+    pad_line(line2, text + MAX_CHARS, MAX_CHARS + 1);
 
-    lcd_clear();
+    // lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_string(line1);
 
@@ -330,12 +408,11 @@ void setup_pwm(uint8_t gpio) {
     gpio_set_function(gpio, GPIO_FUNC_PWM);
     // Configura frecuencia de PWM e inicializa
     uint32_t slice = pwm_gpio_to_slice_num(gpio);
-    pwm_set_clkdiv(slice, 1.4648);
+    pwm_set_clkdiv(slice, 1.0f);
     pwm_set_wrap(slice, MAX_PWM_DUTY);
     pwm_set_gpio_level(gpio, 0);
     pwm_set_enabled(slice, true);
 }
-
 
 
 void btn_irq_handler(uint gpio, uint32_t events) {
@@ -445,13 +522,18 @@ void task_i2c_guard(void *pvParameters) {
                 if (guard_data.queue != NULL) {
                     guard_data.callback(guard_data.param);
                     ina219_context_t *context = (ina219_context_t *) guard_data.param;
-                    xQueueSend(guard_data.queue, context->data, 1);
+                    xQueueOverwrite(guard_data.queue, context->data);
                 } else {
                     guard_data.callback(guard_data.param);
                 }
                 break;
             case I2C_RTC:
-
+                if (guard_data.queue != NULL) {
+                    guard_data.callback(guard_data.param);
+                    xQueueOverwrite(guard_data.queue, (time_t *) guard_data.param);
+                } else {
+                    guard_data.callback(guard_data.param);
+                }
                 break;
         }
         vTaskDelay(pdMS_TO_TICKS(SLEEP_I2C_GUARD));

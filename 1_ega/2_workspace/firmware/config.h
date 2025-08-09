@@ -11,6 +11,8 @@
 #include "semphr.h"
 #include "lcd.h"
 #include "ina219.h"
+#include "ds3231.h"
+#include "sd_card.h"
 
 // I2C definiciones
 #define I2C_PORT i2c1
@@ -20,24 +22,27 @@
 
 #define SLEEP_TIME_LCD  250 // Tiempo de espera en ms para la LCD
 
-#define MAX_CURRENT_INA219 0.3f
+#define MAX_CURRENT_INA219 2.0f
 #define SLEEP_INA219    100
 
 #define SLEEP_I2C_GUARD 50 // Tiempo de espera en ms para el guardia I2C
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
-#define BTN_MENU_GPIO 14
-#define BTN_STOP_GPIO 15
-#define BTN_SWITCH_GPIO 13
+#define BTN_MENU_GPIO 6
+#define BTN_STOP_GPIO 7
+#define BTN_SWITCH_GPIO 14
 #define MAX_MENU_NUM 2
 
-#define ENC_CHA_GPIO 11
-#define ENC_CHB_GPIO 12
+#define ENC_CHA_GPIO 12
+#define ENC_CHB_GPIO 13
 #define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
-#define MAX_PWM_DUTY 1024
+#define PWM_GAIN 1.4f
+#define MAX_PWM_DUTY 7000
+#define MIN_PWM_VOUT (float) (3.0f / PWM_GAIN)
+#define MIN_PWM_DUTY (uint16_t) (MAX_PWM_DUTY * MIN_PWM_VOUT / 3.3f)
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
@@ -45,7 +50,7 @@
 #define Kd 4
 #define Ki 3.5
 #define MAX_INTEGRAL_VALUE 1000.0f
-#define CONTROLLER_REFRESH_MS 10
+#define CONTROLLER_REFRESH_MS 100
 
 #define MINIMUM_RESISTANCE 2.0f
 
@@ -105,7 +110,6 @@ typedef struct {
     float resistance_adj;
     bool pid_escalon;
     bool pid_stable;
-    ina219_data_t ina219_data;
 } system_config_t;
 
 void btn_irq_handler(uint gpio, uint32_t events);

@@ -150,3 +150,8 @@ time_t rtc_get_time(void) {
 
     return fecha;
 }
+
+void rtc_get_time_guard(void *param) {
+    time_t *time = (time_t *) param;
+    *time = rtc_get_time();
+}

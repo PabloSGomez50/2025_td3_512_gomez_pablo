@@ -56,6 +56,9 @@ add_subdirectory(
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../rtc_ds3231 ${CMAKE_BINARY_DIR}/rtc_ds3231
 )
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../sd_card ${CMAKE_BINARY_DIR}/sd_card
+)
 
 # Add the standard library to the build
 target_link_libraries(
@@ -67,6 +70,7 @@ target_link_libraries(
     lcd
     ina219
     rtc_ds3231
+    sd_card
 )
 
 # Add the standard include files to the build

@@ -41,4 +41,6 @@ void rtc_set_time(time_t time);
 uint8_t rtc_read_item(uint8_t reg);
 time_t rtc_get_time(void);
 
+void rtc_get_time_guard(void *param);
+
 #endif
