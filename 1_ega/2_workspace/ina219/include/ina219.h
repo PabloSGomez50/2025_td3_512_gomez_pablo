@@ -15,26 +15,39 @@
 #define INA219_REG_CALIBRATION  0x05
 
 #define TIMEOUT_US              10000
+#define INA219_ADJ              0.8f
 
 typedef enum {
-    INA219_OK = 0,
-    INA219_ERROR = -1,
-    INA219_TIMEOUT = -2
+    INA219_OK,
+    INA219_TIMEOUT              = -1,
+    INA219_INVALID_PARAM        = -2,
+    INA219_INIT_ERROR           = -3,
+    INA219_CALIBRATION_ERROR    = -4,
 } ina219_status_t;
+
+typedef enum {
+    INA219_GAIN_1_40MV   = 0x00,
+    INA219_GAIN_2_80MV   = 0x01,
+    INA219_GAIN_4_160MV  = 0x02,
+    INA219_GAIN_8_320MV  = 0x03
+} ina219_gain_t;
 
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;
     float _current_lsb;
-    float _shunt_resistor_value;
-    float _max_expected_amps;
+    float shunt_resistor_value;
+    float max_expected_amps;
+    ina219_gain_t gain;
 } ina219_t;
 
 typedef struct {
-    float voltage_v;
-    float current_a;
-    float power_w;
+    float voltage_v;  // Bus voltage in volts
+    float current_a;  // Current in amperes
+    float power_w;    // Power in watts
+    float shunt_voltage_v; // Shunt voltage in volts
 } ina219_data_t;
+
 
 typedef struct {
     ina219_data_t *data;
@@ -47,19 +60,21 @@ static inline ina219_t ina219_get_default_config(void) {
     return (ina219_t) {
         .i2c = i2c0,
         .addr = INA219_I2C_ADDR,
-        ._max_expected_amps = 4.0f,
-        ._shunt_resistor_value = 0.1f,
+        ._current_lsb = 0.0f,
+        .shunt_resistor_value = 0.1f,
+        .max_expected_amps = 3.2f,
+        .gain = INA219_GAIN_8_320MV // Default gain
     };
 }
 
-ina219_status_t ina219_init(ina219_t ina219);
-ina219_status_t ina219_calibrate(ina219_t ina219);
+ina219_status_t ina219_init_and_calibrate(ina219_t ina219);
+ina219_status_t ina219_read_data(ina219_t ina219, ina219_data_t *data);
 ina219_status_t ina219_read_voltage(ina219_t ina219, float *voltage);
 ina219_status_t ina219_read_shunt_voltage(ina219_t ina219, float *shunt_voltage);
 ina219_status_t ina219_read_current(ina219_t ina219, float *current);
 ina219_status_t ina219_read_power(ina219_t ina219, float *power);
 
-void ina219_init_and_calibrate(void * ina219_ptr);
-void ina219_get_data(void * ina219);
+void ina219_init_rtos(void * context_ptr);
+void ina219_get_data_rtos(void * context_ptr);
 
 #endif // INA219_H

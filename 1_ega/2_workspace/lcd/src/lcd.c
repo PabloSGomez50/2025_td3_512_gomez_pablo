@@ -101,3 +101,9 @@ void lcd_init(i2c_inst_t *i2c, uint8_t address) {
     lcd_send_byte(LCD_DISPLAYCONTROL | LCD_DISPLAYON, LCD_COMMAND);
     lcd_clear();
 }
+
+
+void lcd_init_rtos(void *param) {
+    struct lcd_config *config = (struct lcd_config *) param;
+    lcd_init(config->i2c, config->addr);
+}

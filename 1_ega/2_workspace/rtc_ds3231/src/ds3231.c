@@ -75,7 +75,8 @@ uint8_t rtc_read_item(uint8_t reg) {
  * @brief inicializa el rtc
  * @param i2c i2c a utilizar
  */
-void rtc_init(i2c_inst_t *i2c) {
+void rtc_init(void *i2c_param) {
+    i2c_inst_t *i2c = (i2c_inst_t *) i2c_param;
     rtc_i2c = i2c;
     uint8_t year = rtc_read_item(RTC_YEAR);
     if (year == 99) {
@@ -151,7 +152,7 @@ time_t rtc_get_time(void) {
     return fecha;
 }
 
-void rtc_get_time_guard(void *param) {
+void rtc_get_time_rtos(void *param) {
     time_t *time = (time_t *) param;
     *time = rtc_get_time();
 }
