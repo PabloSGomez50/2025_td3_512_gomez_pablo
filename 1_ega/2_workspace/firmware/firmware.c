@@ -24,11 +24,12 @@ QueueHandle_t queue_input_data;
 QueueHandle_t queue_rtc_time;
 
 int16_t pwm_test_wrap = MIN_PWM_DUTY;
+uint8_t resistence_step = 10;
 
 system_config_t system_config = {
     .menu = 0,
     .pid_enabled = false,
-    .resistance_target = 500.0f, // Valor inicial de resistencia objetivo
+    .resistance_target = 500, // Valor inicial de resistencia objetivo
     .pid_stable = false
 };
 
@@ -70,7 +71,7 @@ void task_main(void *pvParameters) {
                 if (fixed_index) {
                     switch (system_config.index) {
                         case 0:
-                            system_config.resistance_adj += input_data.increment ? 0.5f : -0.5f;
+                            system_config.resistance_adj += input_data.increment ? resistence_step : -resistence_step;
                             if (system_config.resistance_adj < MINIMUM_RESISTANCE) {
                                 system_config.resistance_adj = MINIMUM_RESISTANCE;
                             }
@@ -131,16 +132,14 @@ void task_pid_controller(void *pvParameters) {
     // Configuración del PWM
     setup_pwm(PWM_PIN);
     ina219_data_t ina219_data;
-    float resistance = 0.0f;
-    float error = 0.0f;
-    float last_error = 0.0f;
+    uint16_t resistance = 0;
+    uint16_t pwm_value = 0;
+    uint16_t error = 0;
+    uint16_t last_error = 0;
+    uint16_t integral_value = 0;
 
-    uint32_t ticks = xTaskGetTickCount();
-    uint32_t last_ticks = ticks;
-    uint32_t elapsed_ticks = 0;
-
-    float integral_value = 0.0f;
-
+    TickType_t ticks = xTaskGetTickCount();
+    
     while(1) {
         if (system_config.pid_enabled && pwm_test_wrap > MIN_PWM_DUTY && pwm_test_wrap < MAX_PWM_DUTY) {
             pwm_set_gpio_level(PWM_PIN, pwm_test_wrap);
@@ -148,45 +147,55 @@ void task_pid_controller(void *pvParameters) {
             pwm_set_gpio_level(PWM_PIN, 0);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+        vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
     }
 
     while(1) {
-        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
-        
-        if (ina219_data.current_a == 0.0f) {
-            printf("Error: Current is zero, skipping PID calculation.\n");
+        vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+
+        if (!system_config.pid_enabled) {
+            pwm_set_gpio_level(PWM_PIN, 0);
             continue;
         }
-        resistance = ina219_data.voltage_v / ina219_data.current_a;
-        if (resistance < MINIMUM_RESISTANCE) {
-            resistance = MINIMUM_RESISTANCE;
-        }
 
-        elapsed_ticks = ticks - last_ticks;
-        last_ticks = ticks;
+        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
+        
+        if ((ina219_data.current_a * 1000.0f) <= 0.5f) {
+            printf("Error: Current is zero, skipping PID calculation.\n");
+            if (pwm_value < MIN_PWM_DUTY) {
+                pwm_value = MIN_PWM_DUTY;
+            } else {
+                pwm_value += 5;
+            }
+            pwm_set_gpio_level(PWM_PIN, pwm_value);
+            continue;
+        }
+        resistance = (uint16_t) (ina219_data.voltage_v / ina219_data.current_a);
 
         error = system_config.resistance_target - resistance;
-        last_error = error;
-
-        integral_value += error * elapsed_ticks;
+        
+        integral_value += error * CONTROLLER_REFRESH_MS;
         if (integral_value > MAX_INTEGRAL_VALUE) {
             integral_value = MAX_INTEGRAL_VALUE;
         } else if (integral_value < -MAX_INTEGRAL_VALUE) {
             integral_value = -MAX_INTEGRAL_VALUE;
         }
-
-        int16_t duty = (int16_t) (Kp * error + Kd * (error - last_error) / elapsed_ticks + Ki * integral_value);
-
-        if (duty < 0) {
-            duty = 0;
+        
+        int16_t delta_duty = (int16_t) (
+            Kp * error +
+            Kd * (error - last_error) / CONTROLLER_REFRESH_MS +
+            Ki * integral_value
+        );
+        last_error = error;
+        pwm_value += delta_duty;
+        if (pwm_value < MIN_PWM_DUTY) {
+            pwm_value = MIN_PWM_DUTY;
         }
-        if (duty > MAX_PWM_DUTY) {
-            duty = MAX_PWM_DUTY;
+        if (pwm_value > MAX_PWM_DUTY) {
+            pwm_value = MAX_PWM_DUTY;
         }
-        pwm_set_gpio_level(PWM_PIN, duty);
-        // Minima espera entre refresh
-        vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+        pwm_set_gpio_level(PWM_PIN, pwm_value);
+        vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
     }
 }
 
@@ -207,9 +216,9 @@ void task_lcd_display(void *pvParameters) {
 
         switch(system_config.menu) {
             case 0:
-                snprintf(line1, MAX_CHARS, "%cRcte|PID:%s", system_config.index == 0 ? 'X' : ' ', system_config.pid_enabled ? "ON" : "OFF");
+                
+                snprintf(line1, MAX_CHARS, "%cRcte", system_config.index == 0 ? 'X' : ' ');
                 snprintf(line2, MAX_CHARS, "%cINA219", system_config.index == 1 ? 'X' : ' ');
-
                 break;
             case 1:
                 snprintf(line1, MAX_CHARS, "%cRadj: %.2f", system_config.index == 0 ? 'X' : ' ', system_config.resistance_adj);
@@ -231,8 +240,8 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line1, MAX_CHARS, "Error: INA219");
                     snprintf(line2, MAX_CHARS, "No data");
                 } else {
-                    snprintf(line1, MAX_CHARS, "I:%05.1fmA|W:%04d", ina219_data.current_a * 1000.0f, pwm_test_wrap);
-                    snprintf(line2, MAX_CHARS, "R:%05.1fohm|C:%s", ina219_data.voltage_v / ina219_data.current_a, system_config.pid_enabled ? "ON" : "OFF");
+                    snprintf(line1, MAX_CHARS, "I:%04.1fmA|W:%04d", ina219_data.current_a * 1000, pwm_test_wrap);
+                    snprintf(line2, MAX_CHARS, "R:%04.1fohm|C:%s", ina219_data.voltage_v / ina219_data.current_a, system_config.pid_enabled ? "ON" : "OFF");
                 }
 
                 break;
@@ -377,8 +386,8 @@ int main()
     while(true);
 }
 
-void pad_line(char *dest, const char *src, size_t len) {
-    size_t i = 0;
+void pad_line(char *dest, const char *src, uint8_t len) {
+    uint8_t i = 0;
     for (; i < len - 1 && src[i] != '\0'; ++i) {
         dest[i] = src[i];
     }
@@ -394,7 +403,6 @@ void set_lcd_text(void *str) {
     pad_line(line1, text, MAX_CHARS + 1);
     pad_line(line2, text + MAX_CHARS, MAX_CHARS + 1);
 
-    // lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_string(line1);
 
@@ -409,7 +417,7 @@ void setup_pwm(uint8_t gpio) {
     // Configura frecuencia de PWM e inicializa
     uint32_t slice = pwm_gpio_to_slice_num(gpio);
     pwm_set_clkdiv(slice, 1.0f);
-    pwm_set_wrap(slice, MAX_PWM_DUTY);
+    pwm_set_wrap(slice, MAX_PWM_WRAP);
     pwm_set_gpio_level(gpio, 0);
     pwm_set_enabled(slice, true);
 }
@@ -462,10 +470,8 @@ void task_encoder(void *pvParameters) {
     while(1) {
         xQueueReceive(queue_encoder, &enc_status, portMAX_DELAY);
         if (enc_status.cha != enc_status.chb)
-            // index_num = (index_num + 1) % index_max;
             input_data.increment = true;
         else
-            // index_num = (index_num + index_max - 1) % index_max;
             input_data.increment = false;
         xQueueSendToBack(
             queue_input_data,

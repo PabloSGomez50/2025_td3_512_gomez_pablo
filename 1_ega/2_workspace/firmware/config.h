@@ -40,19 +40,25 @@
 
 // Controlador PID y protecciones
 #define PWM_GAIN 1.4f
-#define MAX_PWM_DUTY 7000
+#define MAX_PWM_WRAP 16000
+
+#define MAX_PWM_VOUT (float) (4.4f / PWM_GAIN)
 #define MIN_PWM_VOUT (float) (3.0f / PWM_GAIN)
-#define MIN_PWM_DUTY (uint16_t) (MAX_PWM_DUTY * MIN_PWM_VOUT / 3.3f)
+
+#define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
+#define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+
+#define PID_STATUS_PIN 15
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define Kp 15
-#define Kd 4
-#define Ki 3.5
-#define MAX_INTEGRAL_VALUE 1000.0f
+#define Kp 0.3f
+#define Kd 0.0f
+#define Ki 0.0f
+#define MAX_INTEGRAL_VALUE 1000
 #define CONTROLLER_REFRESH_MS 100
 
-#define MINIMUM_RESISTANCE 2.0f
+#define MINIMUM_RESISTANCE 5
 
 typedef struct {
     uint16_t year;
@@ -74,8 +80,6 @@ typedef struct  {
     uint8_t gpio;
     SemaphoreHandle_t *sem_bin;
     btn_devices_enum device;
-    // uint8_t *counter;
-    // uint8_t max_counter;
 } btn_data_t;
 
 typedef struct encoder_t {
@@ -106,8 +110,8 @@ typedef struct {
     uint8_t menu;
     uint8_t index;
     bool pid_enabled;
-    float resistance_target;
-    float resistance_adj;
+    uint16_t resistance_target;
+    uint16_t resistance_adj;
     bool pid_escalon;
     bool pid_stable;
 } system_config_t;
