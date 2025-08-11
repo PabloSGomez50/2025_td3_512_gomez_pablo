@@ -22,10 +22,12 @@
 
 #define SLEEP_TIME_LCD  250 // Tiempo de espera en ms para la LCD
 
-#define MAX_CURRENT_INA219 2.0f
-#define SLEEP_INA219    100
+#define INA219_MAX_CURRENT 0.75f
+#define SLEEP_I2C_GUARD 20 // Tiempo de espera en ms para el guardia I2C
+#define SLEEP_INA219    50
 
-#define SLEEP_I2C_GUARD 50 // Tiempo de espera en ms para el guardia I2C
+#define MINIMUM_RESISTANCE 10
+#define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
@@ -42,8 +44,8 @@
 #define PWM_GAIN 1.4f
 #define MAX_PWM_WRAP 16000
 
-#define MAX_PWM_VOUT (float) (4.4f / PWM_GAIN)
-#define MIN_PWM_VOUT (float) (3.0f / PWM_GAIN)
+#define MAX_PWM_VOUT (float) (4.55f / PWM_GAIN)
+#define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
@@ -58,7 +60,6 @@
 #define MAX_INTEGRAL_VALUE 1000
 #define CONTROLLER_REFRESH_MS 100
 
-#define MINIMUM_RESISTANCE 5
 
 typedef struct {
     uint16_t year;
@@ -87,6 +88,17 @@ typedef struct encoder_t {
     bool chb;
 } encoder_t;
 
+
+typedef enum {
+    MENU_MAIN = 255,
+    MENU_SET_RESISTANCE = 0,
+    MENU_PID_TUNING = 1,
+    MENU_TEST = 2,
+    MENU_TIME = 3,
+    MENU_SD = 4,
+    MENU_REG_FUENTE = 5
+} menu_t;
+
 typedef enum  {
     I2C_INA219,
     I2C_LCD,
@@ -100,20 +112,23 @@ typedef struct {
     void * param;
 } i2c_guard_t;
 
-
 typedef struct {
     btn_devices_enum device;
     bool increment;
 } input_data_t;
 
 typedef struct {
-    uint8_t menu;
+    menu_t menu;
     uint8_t index;
+    bool fixed_index;
+
+    bool sd_mounted;
+
     bool pid_enabled;
-    uint16_t resistance_target;
-    uint16_t resistance_adj;
     bool pid_escalon;
     bool pid_stable;
+    uint16_t resistance_target;
+    uint16_t resistance_adj;
 } system_config_t;
 
 void btn_irq_handler(uint gpio, uint32_t events);
@@ -122,6 +137,7 @@ void task_btn_pull_up(void *pvParameters);
 void task_pid_controller(void *pvParameters);
 void task_i2c_guard(void *pvParameters);
 void task_ina219(void *pvParameters);
+void task_rtc(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 
