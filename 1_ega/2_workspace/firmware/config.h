@@ -20,9 +20,9 @@
 #define I2C_SCL 19
 #define LCD_ADDR 0x27
 
-#define SLEEP_TIME_LCD  250 // Tiempo de espera en ms para la LCD
+#define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
-#define INA219_MAX_CURRENT 0.75f
+#define INA219_MAX_CURRENT 0.5f
 #define SLEEP_I2C_GUARD 20 // Tiempo de espera en ms para el guardia I2C
 #define SLEEP_INA219    50
 
@@ -44,7 +44,7 @@
 #define PWM_GAIN 1.4f
 #define MAX_PWM_WRAP 16000
 
-#define MAX_PWM_VOUT (float) (4.55f / PWM_GAIN)
+#define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN) // 4.55 trabajo
 #define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
@@ -54,11 +54,14 @@
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
+#define MAX_VOLTAGE 12.0f
 #define Kp 0.3f
 #define Kd 0.0f
 #define Ki 0.0f
 #define MAX_INTEGRAL_VALUE 1000
-#define CONTROLLER_REFRESH_MS 100
+#define CONTROLLER_REFRESH_MS 250
+
+#define LOGGER_CHUNK_SIZE 10
 
 
 typedef struct {
@@ -87,7 +90,6 @@ typedef struct encoder_t {
     bool cha;
     bool chb;
 } encoder_t;
-
 
 typedef enum {
     MENU_MAIN = 255,
@@ -130,6 +132,30 @@ typedef struct {
     uint16_t resistance_target;
     uint16_t resistance_adj;
 } system_config_t;
+
+
+typedef struct {
+    float temperature;
+    float voltage_v;
+    float current_ma;
+    uint16_t resistance_target;
+    float error;
+    bool pid_enabled;
+    bool pid_stable;
+    time_t time;
+} datalogger_t;
+
+typedef enum {
+    CONFIG_FILE,
+    LOG_FILE
+} sd_input_t;
+
+typedef struct {
+    sd_input_t type;
+    datalogger_t data;
+} sd_event_t;
+
+
 
 void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);

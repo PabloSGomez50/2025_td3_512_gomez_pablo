@@ -26,19 +26,18 @@ typedef enum {
 } ina219_status_t;
 
 typedef enum {
-    INA219_GAIN_1_40MV   = 0x00,
-    INA219_GAIN_2_80MV   = 0x01,
-    INA219_GAIN_4_160MV  = 0x02,
-    INA219_GAIN_8_320MV  = 0x03
+    INA219_GAIN_1_40MV   = 0U,
+    INA219_GAIN_2_80MV   = 1U,
+    INA219_GAIN_4_160MV  = 2U,
+    INA219_GAIN_8_320MV  = 3U
 } ina219_gain_t;
 
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;
-    float _current_lsb;
     float shunt_resistor_value;
     float max_expected_amps;
-    ina219_gain_t gain;
+    uint8_t gain;
 } ina219_t;
 
 typedef struct {
@@ -60,7 +59,6 @@ static inline ina219_t ina219_get_default_config(void) {
     return (ina219_t) {
         .i2c = i2c0,
         .addr = INA219_I2C_ADDR,
-        ._current_lsb = 0.0f,
         .shunt_resistor_value = 0.1f,
         .max_expected_amps = 3.2f,
         .gain = INA219_GAIN_8_320MV // Default gain

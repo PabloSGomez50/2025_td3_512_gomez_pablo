@@ -20,11 +20,14 @@ int8_t open_file_sd_card(FATFS *fs, FIL *file, const char *filename, BYTE mode) 
     
 }
 
-int8_t open_apend_file(FATFS *fs, FIL *file, const char * filename) {
-    FRESULT res;
+bool sd_card_alive(void) {
+    FIL fp;
+    char buf = 'A';
+    UINT br;
 
-    
+    if (f_open(&fp, "test.txt", FA_WRITE | FA_OPEN_ALWAYS) != FR_OK) return false;
+    FRESULT res = f_write(&fp, &buf, 1, &br);
+    f_close(&fp);
+
+    return (res == FR_OK);
 }
-
-
-

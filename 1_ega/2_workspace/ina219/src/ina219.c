@@ -3,7 +3,7 @@
 static ina219_status_t read_register(ina219_t ina219, uint8_t reg, uint16_t *result) {
     uint8_t buf[2];
 
-    i2c_write_timeout_us(ina219.i2c, ina219.addr, &reg, 1, true, TIMEOUT_US);
+    i2c_write_timeout_us(ina219.i2c, ina219.addr, &reg, 1, false, TIMEOUT_US);
     if(i2c_read_timeout_us(ina219.i2c, ina219.addr, buf, 2, false, TIMEOUT_US) == PICO_ERROR_TIMEOUT) {
         return INA219_TIMEOUT;
     }
@@ -17,32 +17,48 @@ static ina219_status_t write_register(ina219_t ina219, uint8_t reg, uint16_t val
     buf[0] = reg;
     buf[1] = (value >> 8) & 0xFF;
     buf[2] = value & 0xFF;
-    uint8_t status = i2c_write_timeout_us(ina219.i2c, ina219.addr, buf, 3, true, TIMEOUT_US);
-
+    uint8_t status = i2c_write_timeout_us(ina219.i2c, ina219.addr, buf, 3, false, TIMEOUT_US);
+    // return INA219_OK;
     return status == 3 ? INA219_OK : (ina219_status_t) status;
 }
 
 ina219_status_t ina219_init_and_calibrate(ina219_t ina219) {
-    if (ina219.shunt_resistor_value <= 0.0f || ina219.max_expected_amps <= 0.0f) {
+    if (ina219.shunt_resistor_value * 10 <= 0 || ina219.max_expected_amps * 10 <= 0) {
         return INA219_INVALID_PARAM; // Invalid configuration
     }
-    float max_range = powf(2.0f, (float)ina219.gain) * 0.04f;
-    if (max_range < (ina219.max_expected_amps * ina219.shunt_resistor_value)) {
+    float gain_voltage_range[] = {0.04f, 0.08f, 0.16f, 0.32f};
+    if (gain_voltage_range[ina219.gain] < (ina219.max_expected_amps * ina219.shunt_resistor_value)) {
         return INA219_INVALID_PARAM; // Invalid gain setting
     }
     uint16_t config = 0x399F & ~(0b11 << 11);
-    config |= (ina219.gain << 11); // Set gain bits
+    switch (ina219.gain) {
+        case INA219_GAIN_1_40MV:
+            config |= (0b00 << 11); // Gain 1, 40mV
+            break;
+        case INA219_GAIN_2_80MV:
+            config |= (0b01 << 11); // Gain 2, 80mV
+            break;
+        case INA219_GAIN_4_160MV:
+            config |= (0b10 << 11); // Gain 4, 160mV
+            break;
+        case INA219_GAIN_8_320MV:
+            config |= (0b11 << 11); // Gain 8, 320mV
+            break;
+        default:
+            return INA219_INVALID_PARAM; // Invalid gain setting
+    }
     ina219_status_t status = write_register(ina219, INA219_REG_CONFIG, config);
     if (status != INA219_OK) {
         return INA219_INIT_ERROR; // Initialization error
     }
     
-    ina219._current_lsb = ina219.max_expected_amps / 32768.0;
-    uint16_t cal_reg_value = (uint16_t)(0.04096 / (ina219._current_lsb * ina219.shunt_resistor_value));
+    float _current_lsb = ina219.max_expected_amps / 32768.0f;
+    uint16_t cal_reg_value = (uint16_t) (0.04096f / (_current_lsb * ina219.shunt_resistor_value));
     status = write_register(ina219, INA219_REG_CALIBRATION, cal_reg_value);
     if (status != INA219_OK) {
         return INA219_CALIBRATION_ERROR; // Calibration error
     }
+    return INA219_OK;
 }
 
 ina219_status_t ina219_read_data(ina219_t ina219, ina219_data_t *data) {
@@ -72,7 +88,7 @@ ina219_status_t ina219_read_voltage(ina219_t ina219, float *voltage) {
 }
 
 ina219_status_t ina219_read_shunt_voltage(ina219_t ina219, float *shunt_voltage) {
-    int16_t value;
+    uint16_t value;
     ina219_status_t status = read_register(ina219, INA219_REG_SHUNTVOLTAGE, &value);
     *shunt_voltage = value * 0.01;
     return status;
@@ -81,14 +97,18 @@ ina219_status_t ina219_read_shunt_voltage(ina219_t ina219, float *shunt_voltage)
 ina219_status_t ina219_read_current(ina219_t ina219, float *current) {
     int16_t value;
     ina219_status_t status = read_register(ina219, INA219_REG_CURRENT, &value);
-    *current = value * ina219._current_lsb;
+    if (value < 0) {
+        *current = 0.0f;
+    } else {
+        *current = value * ina219.max_expected_amps / 32768.0f;
+    }
     return status;
 }
 
 ina219_status_t ina219_read_power(ina219_t ina219, float *power) {
     uint16_t value;
     ina219_status_t status = read_register(ina219, INA219_REG_POWER, &value);
-    *power = value * 20.0f * ina219._current_lsb;
+    *power = value * 20.0f * ina219.max_expected_amps / 32768.0f;
     return status;
 }
 

@@ -22,6 +22,7 @@ QueueHandle_t queue_ina219_data;
 QueueHandle_t queue_i2c_guard;
 QueueHandle_t queue_input_data;
 QueueHandle_t queue_rtc_time;
+QueueHandle_t queue_datalogger;
 
 int16_t pwm_test_wrap = MIN_PWM_DUTY;
 uint8_t resistance_step = 10;
@@ -32,7 +33,7 @@ system_config_t system_config = {
     .fixed_index = false,
     .pid_enabled = false,
     .resistance_target = 500,
-    .pid_stable = false,
+    .pid_stable = true,
     .sd_mounted = false,
 };
 
@@ -177,7 +178,7 @@ void task_lcd_display(void *pvParameters) {
                     main_options[idx2]);
                 break;
             case MENU_SET_RESISTANCE:
-                snprintf(line1, max_format_chars, "%cPaso:%03d%cR:%04d",
+                snprintf(line1, max_format_chars, "%cPaso:%3d%cR:%4d",
                     (system_config.index == 0 & blink_state) ? '>' : ' ',
                     resistance_step,
                     (system_config.index == 1 & blink_state) ? '>' : ' ',
@@ -190,7 +191,7 @@ void task_lcd_display(void *pvParameters) {
                 );
                 break;
             case MENU_PID_TUNING:
-                snprintf(line1, max_format_chars, "Robj: %05d Ohm", system_config.resistance_target);
+                snprintf(line1, max_format_chars, "Robj: %5d Ohm", system_config.resistance_target);
                 snprintf(line2, max_format_chars, "Pid: %s", system_config.pid_enabled ? "ON" : "OFF");
                 break;
             case MENU_TEST:
@@ -199,8 +200,8 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line1, max_format_chars, "Error: INA219");
                     snprintf(line2, max_format_chars, "No data");
                 } else {
-                    snprintf(line1, max_format_chars, "W:%05d|I:%04.1fmA", pwm_test_wrap, ina219_data.current_a * 1000);
-                    snprintf(line2, max_format_chars, "C:%s|R:%04.1fohm", system_config.pid_enabled ? "ON " : "OFF", ina219_data.voltage_v / ina219_data.current_a);
+                    snprintf(line1, max_format_chars, "W:%5d|I:%04.2fmA", pwm_test_wrap, ina219_data.current_a * 1000);
+                    snprintf(line2, max_format_chars, "C:%s|V:%04.1fv", system_config.pid_enabled ? "ON " : "OFF", ina219_data.voltage_v);
                 }
 
                 break;
@@ -248,13 +249,25 @@ void task_pid_controller(void *pvParameters) {
     ina219_data_t ina219_data;
     uint16_t resistance = 0;
     uint16_t pwm_value = 0;
-    uint16_t error = 0;
-    uint16_t last_error = 0;
-    uint16_t integral_value = 0;
+    float error = 0;
+    float last_error = 0;
+    float integral_value = 0;
+    
+    sd_event_t sd_event = {
+        .type = LOG_FILE,
+        .data = {0}
+    };
+    uint8_t datalogger_index = 0;
 
     TickType_t ticks = xTaskGetTickCount();
     
     while(1) {
+        vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+        if (!system_config.pid_enabled) {
+            pwm_set_gpio_level(PWM_PIN, 0);
+            gpio_put(PID_STATUS_PIN, false);
+            continue;
+        }
         if (system_config.pid_enabled && pwm_test_wrap > MIN_PWM_DUTY && pwm_test_wrap < MAX_PWM_DUTY) {
             pwm_set_gpio_level(PWM_PIN, pwm_test_wrap);
             gpio_put(PID_STATUS_PIN, true);
@@ -262,8 +275,29 @@ void task_pid_controller(void *pvParameters) {
             pwm_set_gpio_level(PWM_PIN, 0);
             gpio_put(PID_STATUS_PIN, false);
         }
+        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
+        if (ina219_data.voltage_v >= MAX_VOLTAGE || ina219_data.current_a >= INA219_MAX_CURRENT) {
+            printf("Error: Voltage or current out of range, skipping PID calculation.\n");
+            system_config.pid_enabled = false;
+            system_config.pid_stable = false;
+            pwm_set_gpio_level(PWM_PIN, 0);
+            continue;
+        }
 
-        vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
+        datalogger_index++;
+        if (datalogger_index >= 5) {
+            sd_event.data = (datalogger_t) {
+                .temperature = 50.0f,
+                .current_ma = ina219_data.current_a * 1000.0f,
+                .voltage_v = ina219_data.voltage_v,
+                .resistance_target = system_config.resistance_target,
+                .error = error,
+                .pid_enabled = system_config.pid_enabled,
+                .pid_stable = system_config.pid_stable
+            };
+            xQueueSend(queue_datalogger, &sd_event, 1);
+            datalogger_index = 0;
+        }
     }
 
     while(1) {
@@ -275,6 +309,14 @@ void task_pid_controller(void *pvParameters) {
         }
 
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
+
+        if (ina219_data.voltage_v >= MAX_VOLTAGE || ina219_data.current_a >= INA219_MAX_CURRENT) {
+            printf("Error: Voltage or current out of range, skipping PID calculation.\n");
+            system_config.pid_enabled = false;
+            system_config.pid_stable = false;
+            pwm_set_gpio_level(PWM_PIN, 0);
+            continue;
+        }
         
         if ((ina219_data.current_a * 1000.0f) <= 0.5f) {
             printf("Error: Current is zero, skipping PID calculation.\n");
@@ -286,9 +328,9 @@ void task_pid_controller(void *pvParameters) {
             pwm_set_gpio_level(PWM_PIN, pwm_value);
             continue;
         }
-        resistance = (uint16_t) (ina219_data.voltage_v / ina219_data.current_a);
+        resistance = (float) (ina219_data.voltage_v / ina219_data.current_a);
 
-        error = system_config.resistance_target - resistance;
+        error = (float) system_config.resistance_target - resistance;
         
         integral_value += error * CONTROLLER_REFRESH_MS;
         if (integral_value > MAX_INTEGRAL_VALUE) {
@@ -303,7 +345,7 @@ void task_pid_controller(void *pvParameters) {
             Ki * integral_value
         );
         last_error = error;
-        pwm_value += delta_duty;
+        pwm_value -= delta_duty;
         if (pwm_value < MIN_PWM_DUTY) {
             pwm_value = MIN_PWM_DUTY;
         }
@@ -311,7 +353,17 @@ void task_pid_controller(void *pvParameters) {
             pwm_value = MAX_PWM_DUTY;
         }
         pwm_set_gpio_level(PWM_PIN, pwm_value);
-    }
+        sd_event.data = (datalogger_t) {
+            .temperature = 50.0f,
+            .voltage_v = ina219_data.voltage_v,
+            .current_ma = ina219_data.current_a * 1000.0f,
+            .resistance_target = system_config.resistance_target,
+            .error = error,
+            .pid_enabled = system_config.pid_enabled,
+            .pid_stable = system_config.pid_stable
+        };
+        xQueueSend(queue_datalogger, &sd_event, 1);
+    }   
 }
 
 void task_read_temp(void *pvParameters) {
@@ -335,6 +387,13 @@ void task_datalogger(void *pvParameters) {
     DIR dir;
     FILINFO fno;
     FIL fp;
+    UINT bw; // Bytes escritos
+
+    datalogger_t data_to_log[LOGGER_CHUNK_SIZE] = {0};
+    uint8_t data_index = 0;
+    sd_event_t sd_event = {0};
+    char buffer[128] = {0};
+    time_t current_time;
     
     while(1) {
         if (!system_config.sd_mounted) {
@@ -344,26 +403,79 @@ void task_datalogger(void *pvParameters) {
             }
         }
 
-        if (system_config.sd_mounted) {
+        while (system_config.sd_mounted) {
+            if (!sd_card_alive()) {
+                printf("Card removed\n");
+                system_config.sd_mounted = false;
+                break;
+            }
+            xQueueReceive(queue_datalogger, &sd_event, portMAX_DELAY);
 
-            // Abre o crea el archivo de log
-            f_res = f_open(&fp, "log.txt", FA_WRITE | FA_OPEN_APPEND);
-            if (f_res != FR_OK) {
-                // El archivo no existe, intenta crearlo
-                f_res = f_open(&fp, "log.txt", FA_WRITE | FA_CREATE_ALWAYS);
+            if (sd_event.type == LOG_FILE) {
+                xQueuePeek(queue_rtc_time, &current_time, portMAX_DELAY);
+                sd_event.data.time = current_time;
+                data_to_log[data_index++] = sd_event.data;
+                if (data_index >= LOGGER_CHUNK_SIZE) {
+                    f_res = f_open(&fp, "log.csv", FA_WRITE | FA_OPEN_APPEND);
+                    if (f_res != FR_OK) {
+                        f_res = f_open(&fp, "log.csv", FA_WRITE | FA_CREATE_NEW);
+                        if (f_res != FR_OK) {
+                            system_config.sd_mounted = false;
+                            continue;
+                        }
+                        snprintf(buffer, sizeof(buffer), "Time;Voltage;Current;Resistance;Error;PID Enabled;PID Stable\n");
+                        f_res = f_write(&fp, buffer, strlen(buffer), &bw);
+                    }
+                    // El puntero esta en la posicion final del archivo
+                    for (uint8_t i = 0; i < data_index; i++) {
+                        snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d;%.2f;%.2f;%04d;%.2f;%01d;%01d\n",
+                            data_to_log[i].time.hour,
+                            data_to_log[i].time.minute,
+                            data_to_log[i].time.second,
+                            data_to_log[i].voltage_v,
+                            data_to_log[i].current_ma,
+                            data_to_log[i].resistance_target,
+                            data_to_log[i].error,
+                            data_to_log[i].pid_enabled ? 1 : 0,
+                            data_to_log[i].pid_stable ? 1 : 0
+                        );
+                        f_res = f_write(&fp, buffer, strlen(buffer), &bw);
+                        if (f_res != FR_OK) {
+                            printf("Error writing to file: %d\n", f_res);
+                            break;
+                        }
+                    }
+                    data_index = 0;
+                    f_close(&fp);
+                }
+            }
+            else if (sd_event.type == CONFIG_FILE) {
+                f_res = f_open(&fp, "config.txt", FA_WRITE | FA_CREATE_ALWAYS);
                 if (f_res != FR_OK) {
-                    printf("Error al abrir o crear el archivo de log: %d\n", f_res);
                     system_config.sd_mounted = false;
                     continue;
                 }
+                snprintf(buffer, sizeof(buffer), "Menu: %d;Index: %d;Fixed Index: %d;SD Mounted: %d;PID Enabled: %d;PID Escalon: %d;PID Stable: %d;Resistance Target: %d;Resistance Adj: %d\n",
+                    system_config.menu,
+                    system_config.index,
+                    system_config.fixed_index,
+                    system_config.sd_mounted,
+                    system_config.pid_enabled,
+                    system_config.pid_escalon,
+                    system_config.pid_stable,
+                    system_config.resistance_target,
+                    system_config.resistance_adj
+                );
+                f_res = f_write(&fp, buffer, strlen(buffer), &bw);
+                if (f_res != FR_OK) {
+                    printf("Error writing to file: %d\n", f_res);
+                }
+                f_close(&fp);
             }
-            // El puntero esta en la posicion final del archivo
-            f_close(&fp);
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Espera 1 segundo
+        vTaskDelay(pdMS_TO_TICKS(750));
     }
-
 }
 
 int main()
@@ -393,6 +505,12 @@ int main()
     queue_rtc_time = xQueueCreate(1, sizeof(time_t));
     if (queue_rtc_time == NULL) {
         printf("Error al crear la cola de tiempo RTC\n");
+        return -1;
+    }
+
+    queue_datalogger = xQueueCreate(3, sizeof(sd_event_t));
+    if (queue_datalogger == NULL) {
+        printf("Error al crear la cola de datalogger\n");
         return -1;
     }
 
@@ -433,11 +551,11 @@ int main()
         &btn_data_2, 3, NULL
     );
     xTaskCreate(
-        task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 1,
+        task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
         NULL, 3, NULL
     );
     xTaskCreate(
-        task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 4,
+        task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 3,
         NULL, 3, NULL
     );
     xTaskCreate(
@@ -451,6 +569,10 @@ int main()
     xTaskCreate(
         task_ina219, "task_ina219", configMINIMAL_STACK_SIZE * 3,
         NULL, 2, NULL
+    );
+    xTaskCreate(
+        task_datalogger, "task_datalogger", configMINIMAL_STACK_SIZE * 6,
+        NULL, 1, NULL
     );
     xTaskCreate(
         task_btn_pull_up, "task_btn_menu", configMINIMAL_STACK_SIZE * 1,

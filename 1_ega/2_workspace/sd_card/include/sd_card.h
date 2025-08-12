@@ -3,7 +3,10 @@
 
 #include "ff.h"
 #include "diskio.h"
+#include "pico/stdlib.h"
+#include <stdio.h>
 
 int8_t open_file_sd_card(FATFS *fs, FIL *file, const char *filename, BYTE mode);
+bool sd_card_alive(void);
 
 #endif // SD_CARD_H
