@@ -11,6 +11,8 @@
 #include "semphr.h"
 #include "lcd.h"
 #include "ina219.h"
+#include "ds3231.h"
+#include "sd_card.h"
 
 // I2C definiciones
 #define I2C_PORT i2c1
@@ -18,36 +20,49 @@
 #define I2C_SCL 19
 #define LCD_ADDR 0x27
 
-#define SLEEP_TIME_LCD  250 // Tiempo de espera en ms para la LCD
+#define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
-#define MAX_CURRENT_INA219 0.3f
-#define SLEEP_INA219    100
+#define INA219_MAX_CURRENT 0.5f
+#define SLEEP_I2C_GUARD 20 // Tiempo de espera en ms para el guardia I2C
+#define SLEEP_INA219    50
 
-#define SLEEP_I2C_GUARD 50 // Tiempo de espera en ms para el guardia I2C
+#define MINIMUM_RESISTANCE 10
+#define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
-#define BTN_MENU_GPIO 14
-#define BTN_STOP_GPIO 15
-#define BTN_SWITCH_GPIO 13
+#define BTN_MENU_GPIO 6
+#define BTN_STOP_GPIO 7
+#define BTN_SWITCH_GPIO 14
 #define MAX_MENU_NUM 2
 
-#define ENC_CHA_GPIO 11
-#define ENC_CHB_GPIO 12
+#define ENC_CHA_GPIO 12
+#define ENC_CHB_GPIO 13
 #define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
-#define MAX_PWM_DUTY 1024
+#define PWM_GAIN 1.4f
+#define MAX_PWM_WRAP 16000
+
+#define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN) // 4.55 trabajo
+#define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
+
+#define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
+#define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+
+#define PID_STATUS_PIN 15
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define Kp 15
-#define Kd 4
-#define Ki 3.5
-#define MAX_INTEGRAL_VALUE 1000.0f
-#define CONTROLLER_REFRESH_MS 10
+#define MAX_VOLTAGE 12.0f
+#define Kp 0.3f
+#define Kd 0.0f
+#define Ki 0.0f
+#define MAX_INTEGRAL_VALUE 1000
+#define CONTROLLER_REFRESH_MS 250
 
-#define MINIMUM_RESISTANCE 2.0f
+#define LOGGER_CHUNK_SIZE 10
+
 
 typedef struct {
     uint16_t year;
@@ -69,14 +84,22 @@ typedef struct  {
     uint8_t gpio;
     SemaphoreHandle_t *sem_bin;
     btn_devices_enum device;
-    // uint8_t *counter;
-    // uint8_t max_counter;
 } btn_data_t;
 
 typedef struct encoder_t {
     bool cha;
     bool chb;
 } encoder_t;
+
+typedef enum {
+    MENU_MAIN = 255,
+    MENU_SET_RESISTANCE = 0,
+    MENU_PID_TUNING = 1,
+    MENU_TEST = 2,
+    MENU_TIME = 3,
+    MENU_SD = 4,
+    MENU_REG_FUENTE = 5
+} menu_t;
 
 typedef enum  {
     I2C_INA219,
@@ -91,22 +114,48 @@ typedef struct {
     void * param;
 } i2c_guard_t;
 
-
 typedef struct {
     btn_devices_enum device;
     bool increment;
 } input_data_t;
 
 typedef struct {
-    uint8_t menu;
+    menu_t menu;
     uint8_t index;
+    bool fixed_index;
+
+    bool sd_mounted;
+
     bool pid_enabled;
-    float resistance_target;
-    float resistance_adj;
     bool pid_escalon;
     bool pid_stable;
-    ina219_data_t ina219_data;
+    uint16_t resistance_target;
+    uint16_t resistance_adj;
 } system_config_t;
+
+
+typedef struct {
+    float temperature;
+    float voltage_v;
+    float current_ma;
+    uint16_t resistance_target;
+    float error;
+    bool pid_enabled;
+    bool pid_stable;
+    time_t time;
+} datalogger_t;
+
+typedef enum {
+    CONFIG_FILE,
+    LOG_FILE
+} sd_input_t;
+
+typedef struct {
+    sd_input_t type;
+    datalogger_t data;
+} sd_event_t;
+
+
 
 void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);
@@ -114,6 +163,7 @@ void task_btn_pull_up(void *pvParameters);
 void task_pid_controller(void *pvParameters);
 void task_i2c_guard(void *pvParameters);
 void task_ina219(void *pvParameters);
+void task_rtc(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 
