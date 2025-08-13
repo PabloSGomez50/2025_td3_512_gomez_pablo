@@ -50,6 +50,9 @@ add_subdirectory(
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../lcd ${CMAKE_BINARY_DIR}/lcd
 )
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../ina219 ${CMAKE_BINARY_DIR}/ina219
+)
 
 # Add the standard library to the build
 target_link_libraries(
@@ -59,6 +62,7 @@ target_link_libraries(
     hardware_pwm
     freertos
     lcd
+    ina219
 )
 
 # Add the standard include files to the build
