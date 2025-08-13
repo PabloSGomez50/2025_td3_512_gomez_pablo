@@ -125,6 +125,7 @@ void ina219_get_data_rtos(void* param_ptr) {
         data->voltage_v = -1.0f;
     }
     status = ina219_read_current(ina219, &data->current_a);
+    data->current_a *= 0.8f;
     if (status != INA219_OK) {
         data->current_a = -1.0f;
     }

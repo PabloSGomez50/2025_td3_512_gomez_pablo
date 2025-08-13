@@ -22,9 +22,9 @@
 
 #define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
-#define INA219_MAX_CURRENT 0.5f
+#define INA219_MAX_CURRENT 0.35f
 #define SLEEP_I2C_GUARD 20 // Tiempo de espera en ms para el guardia I2C
-#define SLEEP_INA219    50
+#define SLEEP_INA219    25
 
 #define MINIMUM_RESISTANCE 10
 #define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
@@ -55,13 +55,15 @@
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
 #define MAX_VOLTAGE 12.0f
-#define Kp 0.3f
-#define Kd 0.0f
+#define MAX_CURRENT 0.25f
+#define Kp 9.5f
+#define Kd 0.1f
 #define Ki 0.0f
-#define MAX_INTEGRAL_VALUE 1000
-#define CONTROLLER_REFRESH_MS 250
+#define MAX_INTEGRAL_VALUE 200.0f
+#define CONTROLLER_REFRESH_MS 35
 
-#define LOGGER_CHUNK_SIZE 10
+#define LOGGER_CHUNK_SIZE 20
+#define LOGGER_ITER_FOR_LOG 2
 
 
 typedef struct {
@@ -129,6 +131,7 @@ typedef struct {
     bool pid_enabled;
     bool pid_escalon;
     bool pid_stable;
+
     uint16_t resistance_target;
     uint16_t resistance_adj;
 } system_config_t;
@@ -138,9 +141,9 @@ typedef struct {
     float temperature;
     float voltage_v;
     float current_ma;
-    uint16_t resistance_target;
+    uint16_t resistance;
+    uint16_t pwm_value;
     float error;
-    bool pid_enabled;
     bool pid_stable;
     time_t time;
 } datalogger_t;
