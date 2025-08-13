@@ -20,12 +20,6 @@
 #define I2C_SCL 19
 #define LCD_ADDR 0x27
 
-#define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
-
-#define INA219_MAX_CURRENT 0.35f
-#define SLEEP_I2C_GUARD 20 // Tiempo de espera en ms para el guardia I2C
-#define SLEEP_INA219    25
-
 #define MINIMUM_RESISTANCE 10
 #define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
 
@@ -54,13 +48,18 @@
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define MAX_VOLTAGE 12.0f
+#define INA219_MAX_CURRENT 0.35f
 #define MAX_CURRENT 0.25f
-#define Kp 9.5f
-#define Kd 0.1f
+#define MAX_VOLTAGE 12.0f
+
+#define Kp 9.0f
+#define Kd 0.0f
 #define Ki 0.0f
 #define MAX_INTEGRAL_VALUE 200.0f
-#define CONTROLLER_REFRESH_MS 35
+
+#define CONTROLLER_REFRESH_MS 50
+#define SLEEP_INA219    40
+#define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
 #define LOGGER_CHUNK_SIZE 20
 #define LOGGER_ITER_FOR_LOG 2
@@ -97,10 +96,10 @@ typedef enum {
     MENU_MAIN = 255,
     MENU_SET_RESISTANCE = 0,
     MENU_PID_TUNING = 1,
-    MENU_TEST = 2,
-    MENU_TIME = 3,
-    MENU_SD = 4,
-    MENU_REG_FUENTE = 5
+    MENU_REG_FUENTE = 2,
+    MENU_TEST = 3,
+    MENU_TIME = 4,
+    MENU_SD = 5
 } menu_t;
 
 typedef enum  {

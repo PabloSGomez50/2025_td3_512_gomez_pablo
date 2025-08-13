@@ -40,6 +40,7 @@ system_config_t system_config = {
 
 void task_main(void *pvParameters) {
     input_data_t input_data = {0};
+    time_t edit_time = {0};
 
     while(1) {
         xQueueReceive(queue_input_data, &input_data, portMAX_DELAY);
@@ -68,6 +69,10 @@ void task_main(void *pvParameters) {
                 system_config.index = 0;
                 system_config.pid_enabled = false;
                 system_config.resistance_adj = MINIMUM_RESISTANCE;
+
+                if (system_config.menu == MENU_TIME) {
+                    xQueuePeek(queue_rtc_time, &edit_time, portMAX_DELAY);
+                }
             }
             continue;
         }
@@ -129,6 +134,38 @@ void task_main(void *pvParameters) {
             continue;
         }
 
+        if (system_config.menu == MENU_TIME) {
+            if (input_data.device == ENCODER) {
+                if (!system_config.fixed_index) {
+                    // Cambiar campo a editar: 0=year, 1=month, 2=date, 3=hour, 4=minute, 5=second, 6=Guardar/Salir
+                    system_config.index = (system_config.index + (input_data.increment ? 1 : 6)) % 7;
+                } else {
+                    // Editar el valor del campo seleccionado
+                    switch (system_config.index) {
+                        case 0: edit_time.year   += input_data.increment ? 1 : -1; break;
+                        case 1: edit_time.month  = (edit_time.month  + (input_data.increment ? 1 : 11)) % 12 + 1; break;
+                        case 2: edit_time.date   = (edit_time.date   + (input_data.increment ? 1 : 30)) % 31 + 1; break;
+                        case 3: edit_time.hour   = (edit_time.hour   + (input_data.increment ? 1 : 23)) % 24; break;
+                        case 4: edit_time.minute = (edit_time.minute + (input_data.increment ? 1 : 59)) % 60; break;
+                        case 5: edit_time.second = (edit_time.second + (input_data.increment ? 1 : 59)) % 60; break;
+                    }
+                }
+                continue;
+            }
+            if (input_data.device == BTN_SWITCH) {
+                if (!system_config.fixed_index) {
+                    if (system_config.index == 6) {
+                        // Guardar cambios en el RTC y volver al menú principal
+                        // xQueueSend(queue_rtc_set_time, &edit_time, portMAX_DELAY);
+                        system_config.menu = MENU_MAIN;
+                        system_config.index = 0;
+                        return;
+                    }
+                }
+                // Entrar/salir de edición
+                system_config.fixed_index = !system_config.fixed_index;
+            }
+        }
     }
 }
 
@@ -153,17 +190,20 @@ void task_lcd_display(void *pvParameters) {
     ina219_data_t ina219_data;
     static bool blink_state = false;
     BaseType_t status;
+    
+    time_t current_time;
 
     static const char *main_options[] = {
         "Rcte",
         "Multiples sets",
+        "Reg Fuente",
         "INA219 (TEST)",
         "Time",
-        "SD menu",
-        "Reg Fuente"
+        "SD menu"
     };
     const int menu_count = sizeof(main_options) / sizeof(main_options[0]);
     const uint8_t max_format_chars = MAX_CHARS + 1;
+    
     while(1) {
         switch(system_config.menu) {
             case MENU_MAIN:
@@ -207,7 +247,6 @@ void task_lcd_display(void *pvParameters) {
 
                 break;
             case MENU_TIME:
-                time_t current_time;
                 BaseType_t queue_status = xQueuePeek(queue_rtc_time, &current_time, 1);
                 if (queue_status == pdFALSE) {
                     snprintf(line1, max_format_chars, "Error: RTC");
@@ -733,20 +772,7 @@ void task_i2c_guard(void *pvParameters) {
             case I2C_INA219:
                 if (guard_data.queue != NULL) {
                     ina219_context_t *context = (ina219_context_t *) guard_data.param;
-                    ina219_data_t sum_data = {0};
-
-                    for (int i = 0; i < 2; i++) {
-                        guard_data.callback(guard_data.param);
-                        sum_data.voltage_v     += context->data->voltage_v;
-                        sum_data.current_a     += context->data->current_a;
-                        sum_data.power_w       += context->data->power_w;
-                        vTaskDelay(pdMS_TO_TICKS(5)); 
-                    }
-                    // Promedio
-                    context->data->voltage_v = sum_data.voltage_v / 2.0f;
-                    context->data->current_a = sum_data.current_a / 2.0f;
-                    context->data->power_w   = sum_data.power_w   / 2.0f;
-
+                    guard_data.callback(guard_data.param);
                     xQueueOverwrite(guard_data.queue, context->data);
                 } else {
                     guard_data.callback(guard_data.param);
@@ -761,7 +787,6 @@ void task_i2c_guard(void *pvParameters) {
                 }
                 break;
         }
-        vTaskDelay(pdMS_TO_TICKS(SLEEP_I2C_GUARD));
     }
 }
 
