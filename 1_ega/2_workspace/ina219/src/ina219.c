@@ -31,6 +31,8 @@ ina219_status_t ina219_init_and_calibrate(ina219_t ina219) {
         return INA219_INVALID_PARAM; // Invalid gain setting
     }
     uint16_t config = 0x399F & ~(0b11 << 11);
+    config &= ~(0b111 << 3); // Clear ADC Shunt bits
+    config |= (0b1010 << 3); // Set ADC Shunt to 4 samples per read
     switch (ina219.gain) {
         case INA219_GAIN_1_40MV:
             config |= (0b00 << 11); // Gain 1, 40mV
