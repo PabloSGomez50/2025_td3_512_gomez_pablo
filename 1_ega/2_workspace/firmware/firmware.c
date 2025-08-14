@@ -33,9 +33,11 @@ system_config_t system_config = {
     .index = 0,
     .fixed_index = false,
     .pid_enabled = false,
+    .pid_time_ms = 0,
     .resistance_target = 300,
     .pid_stable = true,
     .sd_mounted = false,
+    .sd_file_count = 0
 };
 
 void task_menu(void *pvParameters) {
@@ -43,6 +45,7 @@ void task_menu(void *pvParameters) {
     time_t edit_time = {0};
     uint8_t resistance_step_index = 1;
     uint8_t resistance_steps[] = {1, 10, 50, 100, 250};
+    i2c_guard_t guard_data = {0};
 
     while(1) {
         xQueueReceive(queue_input_data, &input_data, portMAX_DELAY);
@@ -71,15 +74,29 @@ void task_menu(void *pvParameters) {
                 system_config.index = (input_data.increment ? system_config.index + 1 : system_config.index + 5) % 6;
             }
             if (input_data.device == BTN_SWITCH) {
+                switch (system_config.index) {
+                    case MENU_TIME:
+                        guard_data = (i2c_guard_t) {
+                            .device = I2C_RTC,
+                            .queue = queue_rtc_time,
+                            .callback = rtc_get_time_rtos,
+                            .param = (void *) &edit_time
+                        };
+                        xQueueSend(queue_i2c_guard, &guard_data, portMAX_DELAY);
+                        break;
+                    case MENU_SD:
+                        system_config.sd_mounted = sd_card_alive();
+                        if (system_config.sd_mounted) {
+                            system_config.sd_file_count = sd_card_get_file_count();
+                        }
+                        break;
+                }
                 system_config.menu = system_config.index;
                 system_config.index = 0;
                 system_config.pid_enabled = false;
                 system_config.resistance_adj = system_config.resistance_target;
                 pwm_test_wrap = MIN_PWM_DUTY;
 
-                if (system_config.menu == MENU_TIME) {
-                    xQueuePeek(queue_rtc_time, &edit_time, portMAX_DELAY);
-                }
             }
             continue;
         }
@@ -104,7 +121,10 @@ void task_menu(void *pvParameters) {
                         resistance_step = resistance_steps[resistance_step_index];
                         break;
                     case 2:
-                        system_config.pid_escalon = !system_config.pid_escalon;
+                        system_config.pid_time_ms += input_data.increment ? 100 : -100;
+                        if (system_config.pid_time_ms < 0 || system_config.pid_time_ms > 50000) {
+                            system_config.pid_time_ms = 0;
+                        }
                         break;
                 }
             }
@@ -154,6 +174,7 @@ void task_menu(void *pvParameters) {
                         case 5: edit_time.second = (edit_time.second + (input_data.increment ? 1 : 59)) % 60; break;
                     }
                 }
+                xQueueOverwrite(queue_rtc_time, &edit_time);
                 continue;
             }
 
@@ -161,22 +182,21 @@ void task_menu(void *pvParameters) {
                 if (!system_config.fixed_index) {
                     if (system_config.index == 6) {
                         // Guardar cambios en el RTC y volver al menú principal
-                        // xQueueSend(queue_rtc_set_time, &edit_time, portMAX_DELAY);
+                        guard_data = (i2c_guard_t) {
+                            .device = I2C_RTC,
+                            .queue = NULL,
+                            .callback = rtc_set_time_rtos,
+                            .param = (void *) &edit_time
+                        };
+                        xQueueSend(queue_i2c_guard, &guard_data, portMAX_DELAY);
                         system_config.menu = MENU_MAIN;
                         system_config.index = 0;
-                        return;
+                        continue;
                     }
                 }
                 // Entrar/salir de edición
                 system_config.fixed_index = !system_config.fixed_index;
             }
-        }
-
-        if (system_config.menu == MENU_SD) {
-            if (input_data.device == BTN_SWITCH) {
-                system_config.sd_mounted = sd_card_alive();
-            }
-            continue;
         }
     }
 }
@@ -206,12 +226,12 @@ void task_lcd_display(void *pvParameters) {
     time_t current_time;
 
     static const char *main_options[] = {
-        "Rcte",
-        "Multiples sets",
+        "Set Resistencia",
+        "Control PID",
         "Reg Fuente",
         "INA219 (TEST)",
-        "Time",
-        "SD menu"
+        "Set Tiempo",
+        "Menu SD"
     };
     const int menu_count = sizeof(main_options) / sizeof(main_options[0]);
     const uint8_t max_format_chars = MAX_CHARS + 1;
@@ -236,11 +256,18 @@ void task_lcd_display(void *pvParameters) {
                     (system_config.index == 1 & blink_state) ? '>' : ' ',
                     resistance_step
                 );
-                snprintf(line2, max_format_chars, "%cTipo:%s%cSig.",
-                    (system_config.index == 2 & blink_state) ? '>' : ' ',
-                    system_config.pid_escalon ? "u(t)" : "r(t)",
-                    (system_config.index == 3 & blink_state) ? '>' : ' '
-                );
+                if (system_config.pid_time_ms == 0) {
+                    snprintf(line2, max_format_chars, "%cT: u(t) %cSig.",
+                        (system_config.index == 2 & blink_state) ? '>' : ' ',
+                        (system_config.index == 3 & blink_state) ? '>' : ' '
+                    );
+                } else {
+                    snprintf(line2, max_format_chars, "%cT:%4.1f s%cSig.",
+                        (system_config.index == 2 & blink_state) ? '>' : ' ',
+                        system_config.pid_time_ms / 1000.0f,
+                        (system_config.index == 3 & blink_state) ? '>' : ' '
+                    );
+                }
                 break;
             case MENU_PID_TUNING:
                 xQueuePeek(queue_ina219_data, &ina219_data, 1);
@@ -265,8 +292,16 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line2, max_format_chars, "No data");
                     break;
                 }
-                snprintf(line1, max_format_chars, "Time: %02d:%02d:%02d", current_time.hour, current_time.minute, current_time.second);
-                snprintf(line2, max_format_chars, "Date: %04d-%02d-%02d", current_time.year, current_time.month, current_time.date);
+                snprintf(line2, max_format_chars, "Time:%02d:%02d:%02d %s",
+                    (system_config.index == 3 && !blink_state) ? 24 : current_time.hour,
+                    (system_config.index == 4 && !blink_state) ? 60 : current_time.minute,
+                    (system_config.index == 5 && !blink_state) ? 60 : current_time.second,
+                    (system_config.index == 6 && !blink_state) ? " " : "Ok");
+                snprintf(line1, max_format_chars, "Date:%04d-%02d-%02d",
+                    (system_config.index == 0 && !blink_state) ? 9999 : current_time.year,
+                    (system_config.index == 1 && !blink_state) ? 12 : current_time.month,
+                    (system_config.index == 2 && !blink_state) ? 31 : current_time.date
+                );
                 break;
 
             case MENU_SD:
@@ -324,7 +359,7 @@ void task_pid_controller(void *pvParameters) {
         
         gpio_put(PID_STATUS_PIN, system_config.pid_enabled);
         if (!system_config.pid_enabled) {
-            pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY - 10);
+            pwm_set_gpio_level(PWM_PIN, PWM_OFF);
             integral_value = 0.0f;
             derivative_value = 0.0f;
             last_error = 0.0f;
@@ -337,7 +372,7 @@ void task_pid_controller(void *pvParameters) {
             printf("Error: Voltage or current out of range, Disabling PID calculation.\n");
             system_config.pid_enabled = false;
             system_config.pid_stable = false;
-            pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY - 10);
+            pwm_set_gpio_level(PWM_PIN, PWM_OFF);
             continue;
         }
         if (system_config.menu == MENU_TEST) {
@@ -346,7 +381,7 @@ void task_pid_controller(void *pvParameters) {
                 gpio_put(PID_STATUS_PIN, true);
                 pwm_value = pwm_test_wrap;
             } else {
-                pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY - 10);
+                pwm_set_gpio_level(PWM_PIN, PWM_OFF);
                 gpio_put(PID_STATUS_PIN, false);
             }
         }
@@ -365,7 +400,7 @@ void task_pid_controller(void *pvParameters) {
 
             error = current_target_ma - (ina219_data.current_a * 1000.0f);
 
-            if (fabsf(ina219_data.current_a) < 0.0008f) {
+            if (fabsf(ina219_data.current_a) < 0.0003f) {
                 printf("Error: Current is zero, skipping PID calculation.\n");
                 if (pwm_value < MIN_PWM_DUTY) {
                     pwm_value = MIN_PWM_DUTY;
@@ -379,7 +414,7 @@ void task_pid_controller(void *pvParameters) {
                 integral_value += error * dt;
                 derivative_value = 0.0f;
             } else {
-                derivative_value = 0.01f * (error - last_error) / dt;
+                derivative_value = 0.1f * (error - last_error) / dt;
                 integral_value = 0.0f;
             }
 
@@ -413,6 +448,7 @@ void task_pid_controller(void *pvParameters) {
             pwm_set_gpio_level(PWM_PIN, pwm_value);
             pwm_test_wrap = pwm_value;
         }
+        
         datalogger_index++;
         if (datalogger_index >= LOGGER_ITER_FOR_LOG) {
             sd_event.data = (datalogger_t) {
@@ -459,9 +495,16 @@ void task_datalogger(void *pvParameters) {
     sd_event_t sd_event = {0};
     char buffer[128] = {0};
     char filename[64] = {0};
-    time_t current_time;
     BaseType_t f_res_status;
     uint8_t last_enable_index = 0;
+    
+    time_t current_time;
+    i2c_guard_t guard_data = {
+        .device = I2C_RTC,
+        .queue = NULL,
+        .callback = rtc_get_time_rtos,
+        .param = (void *) &current_time
+    };
     
     while(1) {
         if (!system_config.sd_mounted) {
@@ -481,14 +524,14 @@ void task_datalogger(void *pvParameters) {
             if (data_index < LOGGER_CHUNK_SIZE) {
                 if (last_enable_index != enable_index) {
                     for (uint8_t i = 0; i < data_index; i++) {
-                        memset(&data_to_log[i], 0, sizeof(datalogger_t));
+                        data_to_log[i] = (datalogger_t) {0};
                     }
                     data_index = 0;
+                    last_enable_index = enable_index;
                 }
-                xQueuePeek(queue_rtc_time, &current_time, 1);
+                xQueueSend(queue_i2c_guard, &guard_data, portMAX_DELAY);
                 sd_event.data.time = current_time;
                 data_to_log[data_index++] = sd_event.data;
-                last_enable_index = enable_index;
             } else {
                 snprintf(filename, sizeof(filename), "log-%04d_%02d_%02d-%03d_%02d__%.2f_%.2f_%.2f.csv",
                     current_time.year, current_time.month, current_time.date,
@@ -544,13 +587,13 @@ void task_datalogger(void *pvParameters) {
                 system_config.sd_mounted = false;
                 break;
             }
-            snprintf(buffer, sizeof(buffer), "Menu: %d;Index: %d;Fixed Index: %d;SD Mounted: %d;PID Enabled: %d;PID Escalon: %d;PID Stable: %d;Resistance Target: %d;Resistance Adj: %d\n",
+            snprintf(buffer, sizeof(buffer), "Menu: %d;Index: %d;Fixed Index: %d;SD Mounted: %d;PID Enabled: %d;PID Time: %d;PID Stable: %d;Resistance Target: %d;Resistance Adj: %d\n",
                 system_config.menu,
                 system_config.index,
                 system_config.fixed_index,
                 system_config.sd_mounted,
                 system_config.pid_enabled,
-                system_config.pid_escalon,
+                system_config.pid_time_ms,
                 system_config.pid_stable,
                 system_config.resistance_target,
                 system_config.resistance_adj
@@ -627,6 +670,8 @@ int main()
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
 
+    rtc_set_i2c(I2C_PORT);
+
     // Creacion de tareas
     xTaskCreate(
         task_menu, "task_menu", configMINIMAL_STACK_SIZE * 3,
@@ -668,10 +713,10 @@ int main()
         task_btn_pull_up, "task_btn_clk", configMINIMAL_STACK_SIZE * 1,
         &btn_data_3, 1, NULL
     );
-    xTaskCreate(
-        task_rtc, "task_rtc", configMINIMAL_STACK_SIZE * 1,
-        NULL, 1, NULL
-    );
+    // xTaskCreate(
+    //     task_rtc, "task_rtc", configMINIMAL_STACK_SIZE * 1,
+    //     NULL, 1, NULL
+    // );
     // xTaskCreate(task_read_temp, "task_read_temp", configMINIMAL_STACK_SIZE * 1, NULL, 1, NULL);
 
     vTaskStartScheduler();
@@ -882,7 +927,7 @@ void task_rtc(void *pvParameters) {
     i2c_guard_t guard_data = {
         .device = I2C_RTC,
         .queue = NULL,
-        .callback = rtc_init,
+        .callback = rtc_init_rtos,
         .param = (void *) I2C_PORT
     };
     xQueueSend(

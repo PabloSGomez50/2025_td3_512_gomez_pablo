@@ -31,3 +31,26 @@ bool sd_card_alive(void) {
 
     return (res == FR_OK);
 }
+
+uint8_t sd_card_get_file_count(void) {
+    DIR dir;
+    FRESULT res;
+    FILINFO fno;
+    uint8_t file_count = 0;
+
+    res = f_opendir(&dir, "/");
+    if (res != FR_OK) {
+        return file_count; // Error al abrir el directorio
+    }
+    while (1) {
+        fno.fname[0] = '\0'; // Limpiar el nombre del archivo
+        res = f_readdir(&dir, &fno);
+        if (res != FR_OK || fno.fname[0] == 0) break;
+        sleep_ms(2); // Pequeña pausa para evitar saturar el sistema
+        file_count++;
+    }
+
+    f_closedir(&dir);
+
+   return file_count;
+}
