@@ -36,10 +36,10 @@
 
 // Controlador PID y protecciones
 #define PWM_GAIN 1.4f
-#define MAX_PWM_WRAP 16000
+#define MAX_PWM_WRAP 12000
 
 #define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN) // 4.55 trabajo
-#define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
+#define MIN_PWM_VOUT (float) (3.094f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
@@ -49,21 +49,21 @@
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
 #define INA219_MAX_CURRENT 0.35f
-#define MAX_CURRENT 0.25f
+#define MAX_CURRENT 0.28f
 #define MAX_VOLTAGE 12.0f
 
-#define Kp 9.0f
-#define Kd 0.0f
-#define Ki 0.0f
-#define MAX_INTEGRAL_VALUE 200.0f
+#define Kp 3.85f
+#define Kd 0.8f
+#define Ki 2.4f
+#define MAX_INTEGRAL_VALUE 20.0f
+#define MAX_DERIVATIVE_VALUE 50.0f
 
 #define CONTROLLER_REFRESH_MS 50
-#define SLEEP_INA219    40
+#define SLEEP_INA219    20
 #define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
-#define LOGGER_CHUNK_SIZE 20
-#define LOGGER_ITER_FOR_LOG 2
-
+#define LOGGER_CHUNK_SIZE 15
+#define LOGGER_ITER_FOR_LOG 1
 
 typedef struct {
     uint16_t year;
@@ -143,6 +143,8 @@ typedef struct {
     uint16_t resistance;
     uint16_t pwm_value;
     float error;
+    float integral;
+    float derivative;
     bool pid_stable;
     time_t time;
 } datalogger_t;
