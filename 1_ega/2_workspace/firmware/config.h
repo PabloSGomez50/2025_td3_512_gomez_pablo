@@ -39,32 +39,32 @@
 #define MAX_PWM_WRAP 12000
 
 #define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN) // 4.55 trabajo
-#define MIN_PWM_VOUT (float) (3.094f / PWM_GAIN)
+#define MIN_PWM_VOUT (float) (3.088f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
-#define PWM_OFF (MIN_PWM_DUTY - (MAX_PWM_WRAP / 500))
+#define PWM_OFF MIN_PWM_DUTY
 
 #define PID_STATUS_PIN 15
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define INA219_MAX_CURRENT 0.35f
-#define MAX_CURRENT 0.28f
+#define INA219_MAX_CURRENT 350.0f
+#define MAX_CURRENT 260.0f
 #define MAX_VOLTAGE 12.0f
 
-#define Kp 3.85f
-#define Kd 0.8f
+#define Kp 2.5f
+#define Kd 0.0f
 #define Ki 2.4f
 #define MAX_INTEGRAL_VALUE 20.0f
-#define MAX_DERIVATIVE_VALUE 50.0f
+#define MAX_DERIVATIVE_VALUE 15.0f
 
 #define CONTROLLER_REFRESH_MS 50
-#define SLEEP_INA219    20
+#define SLEEP_INA219    35
 #define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
 
-#define LOGGER_CHUNK_SIZE 10
-#define LOGGER_ITER_FOR_LOG 1
+#define LOGGER_CHUNK_SIZE 15
+#define LOGGER_ITER_FOR_LOG 3
 
 typedef struct {
     uint16_t year;
@@ -100,7 +100,8 @@ typedef enum {
     MENU_REG_FUENTE = 2,
     MENU_TEST = 3,
     MENU_TIME = 4,
-    MENU_SD = 5
+    MENU_SD = 5,
+    MENU_PROTECTION = 6
 } menu_t;
 
 typedef enum  {
@@ -130,7 +131,7 @@ typedef struct {
     uint8_t sd_file_count;
 
     bool pid_enabled;
-    bool pid_stable;
+    uint16_t pwm_value;
     
     uint16_t pid_time_ms;
     uint16_t resistance_target;
@@ -142,13 +143,11 @@ typedef struct {
     float temperature;
     float voltage_v;
     float current_ma;
-    uint16_t resistance;
     uint16_t pwm_value;
     float error;
     float integral;
     float derivative;
-    bool pid_stable;
-    time_t time;
+    uint16_t r_target;
 } datalogger_t;
 
 typedef enum {
@@ -169,11 +168,13 @@ void task_btn_pull_up(void *pvParameters);
 void task_pid_controller(void *pvParameters);
 void task_i2c_guard(void *pvParameters);
 void task_ina219(void *pvParameters);
-void task_rtc(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
+void tune_pid_params(float *kp, float *ki, float *kd, uint16_t resistance_target);
+void limit_float(float *value, float max);
+void wrap_index(uint8_t *index, uint8_t max_index, bool increment);
 
 #endif // __FIRMWARE_CONFIG_H__

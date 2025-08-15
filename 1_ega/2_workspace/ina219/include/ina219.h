@@ -42,7 +42,7 @@ typedef struct {
 
 typedef struct {
     float voltage_v;  // Bus voltage in volts
-    float current_a;  // Current in amperes
+    float current_ma;  // Current in amperes
     float power_w;    // Power in watts
     float shunt_voltage_v; // Shunt voltage in volts
 } ina219_data_t;

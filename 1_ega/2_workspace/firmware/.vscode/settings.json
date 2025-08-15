@@ -43,6 +43,8 @@
         "random": "c",
         "stdio.h": "c",
         "freertos.h": "c",
-        "semphr.h": "c"
+        "semphr.h": "c",
+        "cstdint": "c",
+        "compare": "c"
     }
 }

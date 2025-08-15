@@ -31,8 +31,8 @@ ina219_status_t ina219_init_and_calibrate(ina219_t ina219) {
         return INA219_INVALID_PARAM; // Invalid gain setting
     }
     uint16_t config = 0x399F & ~(0b11 << 11);
-    config &= ~(0b111 << 3); // Clear ADC Shunt bits
-    config |= (0b1010 << 3); // Set ADC Shunt to 4 samples per read
+    // config &= ~(0b1111 << 3); // Clear ADC Shunt bits
+    // config |= (0b1001 << 3); // Set ADC Shunt to 2 samples per read
     switch (ina219.gain) {
         case INA219_GAIN_1_40MV:
             config |= (0b00 << 11); // Gain 1, 40mV
@@ -74,7 +74,7 @@ ina219_status_t ina219_read_data(ina219_t ina219, ina219_data_t *data) {
     status = ina219_read_shunt_voltage(ina219, &data->shunt_voltage_v);
     if (status != INA219_OK) return status;
 
-    status = ina219_read_current(ina219, &data->current_a);
+    status = ina219_read_current(ina219, &data->current_ma);
     if (status != INA219_OK) return status;
 
     status = ina219_read_power(ina219, &data->power_w);
@@ -126,15 +126,15 @@ void ina219_get_data_rtos(void* param_ptr) {
     if (status != INA219_OK) {
         data->voltage_v = -1.0f;
     }
-    status = ina219_read_current(ina219, &data->current_a);
-    data->current_a *= 0.8f;
+    status = ina219_read_current(ina219, &data->current_ma);
+    data->current_ma *= 0.8f * 1000.0f;
     if (status != INA219_OK) {
-        data->current_a = -1.0f;
+        data->current_ma = -1.0f;
     }
-    status = ina219_read_power(ina219, &data->power_w);
-    if (status != INA219_OK) {
-        data->power_w = -1.0f;
-    }
+    // status = ina219_read_power(ina219, &data->power_w);
+    // if (status != INA219_OK) {
+    //     data->power_w = -1.0f;
+    // }
 }
 
 void ina219_init_rtos(void * param_ptr) {
