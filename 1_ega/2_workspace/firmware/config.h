@@ -35,11 +35,11 @@
 #define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
-#define PWM_GAIN 1.4f
+#define PWM_GAIN 1.372f
 #define MAX_PWM_WRAP 12000
 
-#define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN) // 4.55 trabajo
-#define MIN_PWM_VOUT (float) (3.094f / PWM_GAIN)
+#define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN)
+#define MIN_PWM_VOUT (float) (3.0f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
@@ -48,22 +48,24 @@
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define INA219_MAX_CURRENT 0.35f
-#define MAX_CURRENT 0.28f
+#define INA219_MAX_CURRENT 0.32f
+#define MAX_CURRENT 0.280f
 #define MAX_VOLTAGE 12.0f
 
-#define Kp 3.85f
-#define Kd 0.8f
-#define Ki 2.4f
-#define MAX_INTEGRAL_VALUE 20.0f
-#define MAX_DERIVATIVE_VALUE 50.0f
+#define Kp 8.5f
+#define Kd 0.055f
+#define Ki 0.02f
+#define MAX_INTEGRAL_VALUE 10.0f
+#define MAX_DERIVATIVE_VALUE 10.0f
 
 #define CONTROLLER_REFRESH_MS 50
 #define SLEEP_INA219    20
-#define SLEEP_TIME_LCD  300 // Tiempo de espera en ms para la LCD
+#define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
-#define LOGGER_CHUNK_SIZE 15
-#define LOGGER_ITER_FOR_LOG 1
+
+#define USE_SERIAL_LOGGER 0
+#define LOGGER_CHUNK_SIZE 100
+#define LOGGER_MIN_SEND 10
 
 typedef struct {
     uint16_t year;
@@ -96,10 +98,11 @@ typedef enum {
     MENU_MAIN = 255,
     MENU_SET_RESISTANCE = 0,
     MENU_PID_TUNING = 1,
-    MENU_REG_FUENTE = 2,
-    MENU_TEST = 3,
-    MENU_TIME = 4,
-    MENU_SD = 5
+    MENU_TEST = 2,
+    MENU_TIME = 3,
+    MENU_SD = 4,
+    // MENU_REG_FUENTE = 5,
+    MENU_PROTECCION = 6
 } menu_t;
 
 typedef enum  {
@@ -128,25 +131,22 @@ typedef struct {
     bool sd_mounted;
 
     bool pid_enabled;
-    bool pid_escalon;
-    bool pid_stable;
-
+    uint16_t pid_time_ms;
+    uint16_t pwm_value;
+    
     uint16_t resistance_target;
     uint16_t resistance_adj;
 } system_config_t;
 
 
 typedef struct {
-    float temperature;
     float voltage_v;
     float current_ma;
-    uint16_t resistance;
     uint16_t pwm_value;
     float error;
     float integral;
     float derivative;
-    bool pid_stable;
-    time_t time;
+    uint16_t r_target;
 } datalogger_t;
 
 typedef enum {
@@ -156,9 +156,12 @@ typedef enum {
 
 typedef struct {
     sd_input_t type;
-    datalogger_t data;
+    void *data;
+    time_t timestamp;
+    uint8_t chunk_index;
 } sd_event_t;
 
+const char file_header[] = "Voltage;Current;Error;PWM Value;Integral;Derivative;R_Target\n";
 
 
 void btn_irq_handler(uint gpio, uint32_t events);
@@ -167,11 +170,12 @@ void task_btn_pull_up(void *pvParameters);
 void task_pid_controller(void *pvParameters);
 void task_i2c_guard(void *pvParameters);
 void task_ina219(void *pvParameters);
-void task_rtc(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
+void limit_float(float *value, float max);
+void wrap_index(uint8_t *index, uint8_t max_index, bool increment);
 
 #endif // __FIRMWARE_CONFIG_H__
