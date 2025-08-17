@@ -333,7 +333,12 @@ void task_lcd_display(void *pvParameters) {
                 break;
             case MENU_PROTECCION:
                 snprintf(line1, max_format_chars, "Protection activada");
-                snprintf(line2, max_format_chars, "Error: Voltage or current");
+                if (system_config.index == 0) {
+                    snprintf(line2, max_format_chars, "Voltage: %.2fV", MAX_VOLTAGE);
+                } else {
+                    snprintf(line2, max_format_chars, "Current: %.2fmA", MAX_CURRENT);
+                }
+                
                 break;
             default:
                 snprintf(line1, max_format_chars, "Menu: %d", system_config.menu);
@@ -371,6 +376,12 @@ void task_pid_controller(void *pvParameters) {
     ina219_data_t ina219_data;
     uint8_t stable_iters = 0;
     
+    bool pid_start = true;
+    uint16_t r_target = system_config.resistance_target;
+    uint16_t pendiente = 0;
+    uint16_t target_steps = 0;
+    uint16_t steps = 0;
+
     uint16_t pwm_value = 0;
     float current_target_ma = 0;
     float error = 0;
@@ -397,6 +408,7 @@ void task_pid_controller(void *pvParameters) {
             last_error = 0.0f;
             datalogger_index = 0;
             stable_iters = 0;
+            pid_start = true;
             vTaskDelay(pdMS_TO_TICKS(250));
             continue;
         }
@@ -412,14 +424,30 @@ void task_pid_controller(void *pvParameters) {
 
         
         if (system_config.menu == MENU_PID_TUNING) {
-            if (system_config.resistance_target >= 150) {
+            if (pid_start) {
+                steps = 0;
+                if (system_config.pid_time_ms > 0) {
+                    r_target = 2000;
+                    target_steps = system_config.pid_time_ms / CONTROLLER_REFRESH_MS;
+                    pendiente = (system_config.resistance_target - r_target) / target_steps;
+                } else {
+                    target_steps = 0;
+                }
+            }
+            if (steps < target_steps) {
+                r_target += pendiente;
+            } else {
+                r_target = system_config.resistance_target;
+            }
+            pid_start = false;
+            if (r_target >= 150) {
                 kp = Kp;
-            } else if (system_config.resistance_target >= 60) {
+            } else if (r_target >= 60) {
                 kp = Kp * 0.6f;
             } else  {
                 kp = Kp * 0.2f;
             }
-            current_target_ma = 1000.0f * ina219_data.voltage_v / (float) system_config.resistance_target;
+            current_target_ma = 1000.0f * ina219_data.voltage_v / (float) r_target;
 
             error = current_target_ma - (ina219_data.current_a * 1000.0f);
             if (fabsf(error / current_target_ma) <= 0.065f) {
@@ -464,7 +492,6 @@ void task_pid_controller(void *pvParameters) {
             system_config.pwm_value = pwm_value;
         } else if (system_config.menu == MENU_TEST) {
             if (system_config.pwm_value >= MIN_PWM_DUTY && system_config.pwm_value <= MAX_PWM_DUTY) {
-                printf("Tension: %.2f V\nCorriente: %.2f A\nPWM: %d\n", ina219_data.voltage_v, ina219_data.current_a, system_config.pwm_value);
                 pwm_set_gpio_level(PWM_PIN, system_config.pwm_value);
                 gpio_put(PID_STATUS_PIN, true);
             }
@@ -477,7 +504,7 @@ void task_pid_controller(void *pvParameters) {
             .error = error,
             .integral = integral_value,
             .derivative = derivative_value,
-            .r_target = system_config.resistance_target
+            .r_target = r_target
         };
         if ((stable_iters > 10 && datalogger_index > LOGGER_MIN_SEND) || datalogger_index >= LOGGER_CHUNK_SIZE - 1) {
             sd_event.chunk_index = datalogger_index;
@@ -722,42 +749,6 @@ int main()
     while(true);
 }
 
-void pad_line(char *dest, const char *src, uint8_t len) {
-    uint8_t i = 0;
-    for (; i < len - 1 && src[i] != '\0'; ++i) {
-        dest[i] = src[i];
-    }
-    for (; i < len - 1; ++i) {
-        dest[i] = ' ';
-    }
-    dest[len - 1] = '\0'; // Ensure null-termination
-}
-
-void set_lcd_text(void *str) {
-    char *text = (char *) str;
-    char buf_1[MAX_CHARS + 1], buf_2[MAX_CHARS + 1];
-    pad_line(buf_1, text, MAX_CHARS + 1);
-    pad_line(buf_2, text + MAX_CHARS, MAX_CHARS + 1);
-
-    lcd_set_cursor(0, 0);
-    lcd_string(buf_1);
-
-    lcd_set_cursor(1, 0);
-    lcd_string(buf_2);
-}
-
-
-void setup_pwm(uint8_t gpio) {
-    // Asigna función de PWM
-    gpio_set_function(gpio, GPIO_FUNC_PWM);
-    // Configura frecuencia de PWM e inicializa
-    uint32_t slice = pwm_gpio_to_slice_num(gpio);
-    pwm_set_clkdiv(slice, 1.0f);
-    pwm_set_wrap(slice, MAX_PWM_WRAP);
-    pwm_set_gpio_level(gpio, 0);
-    pwm_set_enabled(slice, true);
-}
-
 
 void btn_irq_handler(uint gpio, uint32_t events) {
     static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -933,4 +924,40 @@ void wrap_index(uint8_t *index, uint8_t max_index, bool increment) {
         *index = (*index + 1) % max_index;
     else
         *index = (*index + max_index - 1) % max_index;
+}
+
+void pad_line(char *dest, const char *src, uint8_t len) {
+    uint8_t i = 0;
+    for (; i < len - 1 && src[i] != '\0'; ++i) {
+        dest[i] = src[i];
+    }
+    for (; i < len - 1; ++i) {
+        dest[i] = ' ';
+    }
+    dest[len - 1] = '\0'; // Ensure null-termination
+}
+
+void set_lcd_text(void *str) {
+    char *text = (char *) str;
+    char buf_1[MAX_CHARS + 1], buf_2[MAX_CHARS + 1];
+    pad_line(buf_1, text, MAX_CHARS + 1);
+    pad_line(buf_2, text + MAX_CHARS, MAX_CHARS + 1);
+
+    lcd_set_cursor(0, 0);
+    lcd_string(buf_1);
+
+    lcd_set_cursor(1, 0);
+    lcd_string(buf_2);
+}
+
+
+void setup_pwm(uint8_t gpio) {
+    // Asigna función de PWM
+    gpio_set_function(gpio, GPIO_FUNC_PWM);
+    // Configura frecuencia de PWM e inicializa
+    uint32_t slice = pwm_gpio_to_slice_num(gpio);
+    pwm_set_clkdiv(slice, 1.0f);
+    pwm_set_wrap(slice, MAX_PWM_WRAP);
+    pwm_set_gpio_level(gpio, 0);
+    pwm_set_enabled(slice, true);
 }

@@ -20,7 +20,7 @@
 #define I2C_SCL 19
 #define LCD_ADDR 0x27
 
-#define MINIMUM_RESISTANCE 10
+#define MINIMUM_RESISTANCE 20
 #define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
 
 // Botones y Encoder
@@ -127,7 +127,6 @@ typedef struct {
     menu_t menu;
     uint8_t index;
     bool fixed_index;
-
     bool sd_mounted;
 
     bool pid_enabled;
@@ -138,6 +137,14 @@ typedef struct {
     uint16_t resistance_adj;
 } system_config_t;
 
+typedef struct {
+    float kp;
+    float ki;
+    float kd;
+    uint16_t r_target;
+    uint16_t pid_time;
+    
+} pid_config_t;
 
 typedef struct {
     float voltage_v;
