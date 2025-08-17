@@ -39,7 +39,7 @@
 #define MAX_PWM_WRAP 12000
 
 #define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN)
-#define MIN_PWM_VOUT (float) (3.0f / PWM_GAIN)
+#define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
@@ -48,22 +48,22 @@
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define TEMP_THRESHOLD 130.0f
-#define INA219_MAX_CURRENT 0.32f
-#define MAX_CURRENT 0.280f
+#define INA219_MAX_CURRENT 0.38f
+#define MAX_CURRENT 0.270f
 #define MAX_VOLTAGE 12.0f
 
-#define Kp 8.5f
-#define Kd 0.055f
-#define Ki 0.02f
-#define MAX_INTEGRAL_VALUE 10.0f
+#define Kp 8.2f
+#define Kd 0.032f
+#define Ki 0.035f
+#define MAX_INTEGRAL_VALUE 5.0f
 #define MAX_DERIVATIVE_VALUE 10.0f
 
-#define CONTROLLER_REFRESH_MS 50
-#define SLEEP_INA219    20
+#define CONTROLLER_REFRESH_MS 40
+#define SLEEP_INA219    30
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
 
-#define USE_SERIAL_LOGGER 0
+#define USE_SERIAL_LOGGER 1
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
 

@@ -91,6 +91,8 @@ void task_menu(void *pvParameters) {
                         system_config.menu = MENU_SD;
                         if (system_config.sd_mounted) {
                             system_config.index = sd_card_get_file_count();
+                        } else {
+                            system_config.index = 0;
                         }
                         break;
                     default:
@@ -384,6 +386,7 @@ void task_pid_controller(void *pvParameters) {
     TickType_t ticks = xTaskGetTickCount();
     
     while(1) {
+        // vTaskDelayUntil(&ticks, pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
         vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
         gpio_put(PID_STATUS_PIN, system_config.pid_enabled);
         if (!system_config.pid_enabled) {
@@ -414,12 +417,12 @@ void task_pid_controller(void *pvParameters) {
             } else if (system_config.resistance_target >= 60) {
                 kp = Kp * 0.6f;
             } else  {
-                kp = Kp * 0.4f;
+                kp = Kp * 0.2f;
             }
             current_target_ma = 1000.0f * ina219_data.voltage_v / (float) system_config.resistance_target;
 
             error = current_target_ma - (ina219_data.current_a * 1000.0f);
-            if (fabsf(error / current_target_ma) <= 0.05f) {
+            if (fabsf(error / current_target_ma) <= 0.065f) {
                 integral_value += error * dt / ki;
                 derivative_value = 0.0f;
                 stable_iters++;
@@ -476,7 +479,7 @@ void task_pid_controller(void *pvParameters) {
             .derivative = derivative_value,
             .r_target = system_config.resistance_target
         };
-        if (stable_iters > 5 && datalogger_index > LOGGER_MIN_SEND) {
+        if ((stable_iters > 10 && datalogger_index > LOGGER_MIN_SEND) || datalogger_index >= LOGGER_CHUNK_SIZE - 1) {
             sd_event.chunk_index = datalogger_index;
             xQueuePeek(queue_rtc_time, &current_time, 0);
             sd_event.timestamp = current_time;
