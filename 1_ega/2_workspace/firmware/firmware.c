@@ -195,8 +195,8 @@ void task_menu(void *pvParameters) {
                     // Editar el valor del campo seleccionado
                     switch (system_config.index) {
                         case 0: edit_time.year   += input_data.increment ? 1 : -1; break;
-                        case 1: edit_time.month  = (edit_time.month  + (input_data.increment ? 1 : 11)) % 12 + 1; break;
-                        case 2: edit_time.date   = (edit_time.date   + (input_data.increment ? 1 : 30)) % 31 + 1; break;
+                        case 1: edit_time.month  = (edit_time.month  + (input_data.increment ? 0 : 10)) % 12 + 1; break;
+                        case 2: edit_time.date   = (edit_time.date   + (input_data.increment ? 0 : 29)) % 31 + 1; break;
                         case 3: edit_time.hour   = (edit_time.hour   + (input_data.increment ? 1 : 23)) % 24; break;
                         case 4: edit_time.minute = (edit_time.minute + (input_data.increment ? 1 : 59)) % 60; break;
                         case 5: edit_time.second = (edit_time.second + (input_data.increment ? 1 : 59)) % 60; break;
@@ -320,7 +320,7 @@ void task_lcd_display(void *pvParameters) {
                         1000.0f * ina219_data.current_a
                     );
                 } else {
-                    snprintf(line2, max_format_chars, "V:%4.2fV|T:%5.2fC",
+                    snprintf(line2, max_format_chars, "V:%4.2fV|T:%4.1fC",
                         ina219_data.voltage_v,
                         temp_c
                     );
@@ -436,8 +436,8 @@ void task_pid_controller(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(CONTROLLER_REFRESH_MS));
         gpio_put(PID_STATUS_PIN, system_config.pid_enabled);
         if (!system_config.pid_enabled) {
-            pwm_value = MIN_PWM_DUTY;
-            pwm_set_gpio_level(PWM_PIN, pwm_value);
+            system_config.pwm_value = MIN_PWM_DUTY;
+            pwm_set_gpio_level(PWM_PIN, system_config.pwm_value);
             integral_value = 0.0f;
             derivative_value = 0.0f;
             last_error = 0.0f;
@@ -474,7 +474,7 @@ void task_pid_controller(void *pvParameters) {
         if (pid_start) {
             steps = 0;
             if (system_config.pid_time_ms > 0) {
-                r_target = 2000;
+                r_target = MAXIMUM_RESISTANCE;
                 target_steps = system_config.pid_time_ms / CONTROLLER_REFRESH_MS;
                 pendiente = (system_config.resistance_target - r_target) / target_steps;
             } else {
@@ -505,7 +505,7 @@ void task_pid_controller(void *pvParameters) {
         current_target_ma = 1000.0f * ina219_data.voltage_v / (float) r_target;
 
         error = current_target_ma - (ina219_data.current_a * 1000.0f);
-        if (fabsf(error / current_target_ma) <= 0.065f) {
+        if (fabsf(error / current_target_ma) <= 0.05f) {
             integral_value += error * dt / ki;
             derivative_value = 0.0f;
             stable_iters++;
@@ -537,24 +537,24 @@ void task_pid_controller(void *pvParameters) {
             integral_value
         );
         last_error = error;
-        int32_t temp_pwm = (int32_t)pwm_value + delta_duty;
+        int32_t temp_pwm = (int32_t)system_config.pwm_value + delta_duty;
 
         if (temp_pwm < MIN_PWM_DUTY) temp_pwm = MIN_PWM_DUTY;
         if (temp_pwm > MAX_PWM_DUTY) temp_pwm = MAX_PWM_DUTY;
 
-        pwm_value = (uint16_t)temp_pwm;
-        pwm_set_gpio_level(PWM_PIN, pwm_value);
-        system_config.pwm_value = pwm_value;
-        
+        system_config.pwm_value = (uint16_t)temp_pwm;
+        pwm_set_gpio_level(PWM_PIN, system_config.pwm_value);
+
 
         datalogger_ptr[datalogger_index] = (datalogger_t) {
             .voltage_v = ina219_data.voltage_v,
             .current_ma = ina219_data.current_a * 1000.0f,
-            .pwm_value = pwm_value,
+            .pwm_value = system_config.pwm_value,
             .error = error,
             .integral = integral_value,
             .derivative = derivative_value,
-            .r_target = r_target
+            .r_target = r_target,
+            .temperature = temp
         };
         if ((stable_iters > 10 && datalogger_index > LOGGER_MIN_SEND) || datalogger_index >= LOGGER_CHUNK_SIZE - 1) {
             sd_event.chunk_index = datalogger_index;
@@ -570,18 +570,18 @@ void task_pid_controller(void *pvParameters) {
 }
 
 void task_read_temp(void *pvParameters) {
-    const float gain = 4.92f;
-    const float convert_factor = 3.3f / (1 << 12); // Factor de conversión para 12 bits
-    const float slope_temp = (-20 - 140) / (0.6f - 0.245f);
+    const float gain = 5.01f;
+    const float convert_factor = 3.18f / (1 << 12); // Factor de conversión para 12 bits
+    // const float slope_temp = (-20 - 140) / (0.6f - 0.245f);
+    const float slope_temp = (-20 - 16) / (0.6f - 0.51f);
     float temp = 0.0f;
     // Configuracion de ADC
     adc_init();
     adc_gpio_init(26 + ADC_DIODE_TEMP);
     
-    // Amplificador de ganancia 4.9
     while(1) {
         float v_temp = adc_read() * convert_factor / gain;
-        temp = v_temp / slope_temp + 250;
+        temp = v_temp * slope_temp + 220;
         xQueueOverwrite(queue_temp, &temp);
         vTaskDelay(pdMS_TO_TICKS(500));
     }
@@ -642,14 +642,15 @@ void task_datalogger(void *pvParameters) {
 
             data_to_log = (datalogger_t *) sd_event.data;
             for (uint8_t i = 0; i < sd_event.chunk_index; i++) {
-                printf("%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d\n",
+                printf("%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d;%4.1f\n",
                     data_to_log[i].voltage_v,
                     data_to_log[i].current_ma,
                     data_to_log[i].pwm_value,
                     data_to_log[i].error,
                     data_to_log[i].integral,
                     data_to_log[i].derivative,
-                    data_to_log[i].r_target
+                    data_to_log[i].r_target,
+                    data_to_log[i].temperature
                 );
             }
         #else
@@ -677,14 +678,15 @@ void task_datalogger(void *pvParameters) {
             }
             // El puntero esta en la posicion final del archivo
             for (uint8_t i = 0; i < sd_event.chunk_index; i++) {
-                snprintf(buffer, sizeof(buffer), "%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d\n",
+                snprintf(buffer, sizeof(buffer), "%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d;%4.1f\n",
                     data_to_log[i].voltage_v,
                     data_to_log[i].current_ma,
                     data_to_log[i].pwm_value,
                     data_to_log[i].error,
                     data_to_log[i].integral,
                     data_to_log[i].derivative,
-                    data_to_log[i].r_target
+                    data_to_log[i].r_target,
+                    data_to_log[i].temperature
                 );
                 f_res = f_write(&fp, buffer, strlen(buffer), &bw);
                 if (f_res != FR_OK) {

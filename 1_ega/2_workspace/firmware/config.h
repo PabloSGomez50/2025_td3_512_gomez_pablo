@@ -63,7 +63,7 @@
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
 
-#define USE_SERIAL_LOGGER 0
+#define USE_SERIAL_LOGGER 1
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
 
@@ -153,6 +153,7 @@ typedef struct {
     float integral;
     float derivative;
     uint16_t r_target;
+    float temperature;
 } datalogger_t;
 
 typedef struct {
@@ -172,7 +173,7 @@ typedef struct {
     uint8_t chunk_index;
 } sd_event_t;
 
-const char file_header[] = "Voltage;Current;PWM Value;Error;Integral;Derivative;R_Target\n";
+const char file_header[] = "Voltage;Current;PWM Value;Error;Integral;Derivative;R_Target;Temperature\n";
 const uint8_t r_steps[] = {1, 10, 50, 100, 250};
 
 void btn_irq_handler(uint gpio, uint32_t events);
