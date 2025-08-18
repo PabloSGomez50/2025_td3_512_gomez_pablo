@@ -4,6 +4,13 @@
 	(generator_version "9.0")
 	(uuid "81cd5d4b-9d20-44f7-96cd-6c36b0530d4f")
 	(paper "A4")
+	(title_block
+		(title "Carga Electrónica Programable")
+		(date "2025-08-18")
+		(rev "v1")
+		(company "Pablo Gomez")
+		(comment 1 "Nicolas Pereyra")
+	)
 	(lib_symbols
 		(symbol "Amplifier_Operational:LM358"
 			(pin_names
@@ -10831,7 +10838,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical"
+		(property "Footprint" "Connector_Molex:Molex_KK-254_AE-6410-05A_1x05_P2.54mm_Vertical"
 			(at 107.95 88.9 0)
 			(effects
 				(font
