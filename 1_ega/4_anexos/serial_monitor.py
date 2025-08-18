@@ -3,11 +3,11 @@ import csv
 from datetime import datetime
 
 # Configuración del puerto serie
-PUERTO = 'COM9'   # En Windows sería COM3, COM4, etc.
+PUERTO = 'COM8'   # En Windows sería COM3, COM4, etc.
 BAUDIOS = 115200          # Velocidad del microcontrolador
 
 # Nombre del archivo CSV con timestamp para no sobreescribir
-archivo_salida = f"datos.csv"
+archivo_salida = "datos.csv"
 
 with serial.Serial(PUERTO, BAUDIOS, timeout=1) as ser, open(archivo_salida, 'w', newline='') as f:
     writer = csv.writer(f)

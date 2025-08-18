@@ -21,7 +21,7 @@
 #define LCD_ADDR 0x27
 
 #define MINIMUM_RESISTANCE 20
-#define RESISTANCE_STEP 10 // Paso de resistencia en Ohm
+#define MAXIMUM_RESISTANCE 2000 // Resistencia máxima en Ohm
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
@@ -47,7 +47,7 @@
 #define PID_STATUS_PIN 15
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
-#define TEMP_THRESHOLD 130.0f
+#define MAX_TEMP 130.0f
 #define INA219_MAX_CURRENT 0.38f
 #define MAX_CURRENT 0.270f
 #define MAX_VOLTAGE 12.0f
@@ -63,7 +63,7 @@
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
 
-#define USE_SERIAL_LOGGER 1
+#define USE_SERIAL_LOGGER 0
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
 
@@ -97,7 +97,7 @@ typedef struct encoder_t {
 typedef enum {
     MENU_MAIN = 255,
     MENU_SET_RESISTANCE = 0,
-    MENU_PID_TUNING = 1,
+    MENU_PID = 1,
     MENU_TEST = 2,
     MENU_TIME = 3,
     MENU_SD = 4,
@@ -134,7 +134,7 @@ typedef struct {
     uint16_t pwm_value;
     
     uint16_t resistance_target;
-    uint16_t resistance_adj;
+    int16_t resistance_adj;
 } system_config_t;
 
 typedef struct {
@@ -143,7 +143,6 @@ typedef struct {
     float kd;
     uint16_t r_target;
     uint16_t pid_time;
-    
 } pid_config_t;
 
 typedef struct {
@@ -156,6 +155,12 @@ typedef struct {
     uint16_t r_target;
 } datalogger_t;
 
+typedef struct {
+    uint16_t pid_time_ms;
+    uint16_t r_target;
+    uint8_t r_step_idx;
+} config_t;
+
 typedef enum {
     CONFIG_FILE,
     LOG_FILE
@@ -164,12 +169,11 @@ typedef enum {
 typedef struct {
     sd_input_t type;
     void *data;
-    time_t timestamp;
     uint8_t chunk_index;
 } sd_event_t;
 
-const char file_header[] = "Voltage;Current;Error;PWM Value;Integral;Derivative;R_Target\n";
-
+const char file_header[] = "Voltage;Current;PWM Value;Error;Integral;Derivative;R_Target\n";
+const uint8_t r_steps[] = {1, 10, 50, 100, 250};
 
 void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);
@@ -179,6 +183,7 @@ void task_i2c_guard(void *pvParameters);
 void task_ina219(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
+void task_rtc(void *pvParameters);
 
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
