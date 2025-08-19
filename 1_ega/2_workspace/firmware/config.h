@@ -43,6 +43,7 @@
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+#define PWM_OFF (MIN_PWM_DUTY - (MAX_PWM_WRAP / 500))
 
 #define PID_STATUS_PIN 15
 #define PWM_PIN 16
@@ -61,7 +62,6 @@
 #define CONTROLLER_REFRESH_MS 40
 #define SLEEP_INA219    30
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
-
 
 #define USE_SERIAL_LOGGER 0
 #define LOGGER_CHUNK_SIZE 100
@@ -128,11 +128,12 @@ typedef struct {
     uint8_t index;
     bool fixed_index;
     bool sd_mounted;
+    uint8_t sd_file_count;
 
     bool pid_enabled;
     uint16_t pid_time_ms;
     uint16_t pwm_value;
-    
+  
     uint16_t resistance_target;
     int16_t resistance_adj;
 } system_config_t;

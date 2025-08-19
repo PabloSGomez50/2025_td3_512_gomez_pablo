@@ -38,13 +38,16 @@ system_config_t system_config = {
     .index = 0,
     .fixed_index = false,
     .pid_enabled = false,
+    .pid_time_ms = 0,
     .resistance_target = 300,
     .sd_mounted = false,
+    .sd_file_count = 0
 };
 
 void task_menu(void *pvParameters) {
     input_data_t input_data = {0};
     time_t edit_time = {0};
+
     i2c_guard_t guard_data = {0};
     config_t sd_config = {
         .pid_time_ms = system_config.pid_time_ms,
@@ -56,7 +59,6 @@ void task_menu(void *pvParameters) {
         .data = (void *) &sd_config,
         .chunk_index = 1
     };
-
     while(1) {
         xQueueReceive(queue_input_data, &input_data, portMAX_DELAY);
 
@@ -111,6 +113,7 @@ void task_menu(void *pvParameters) {
                 system_config.pid_enabled = false;
                 system_config.resistance_adj = system_config.resistance_target;
                 system_config.pwm_value = MIN_PWM_DUTY;
+
             }
             continue;
         }
@@ -136,6 +139,7 @@ void task_menu(void *pvParameters) {
                         break;
                     case 2:
                         system_config.pid_time_ms += input_data.increment ? 500 : -500;
+
                         if (system_config.pid_time_ms < 0 || system_config.pid_time_ms > 50000) {
                             system_config.pid_time_ms = 0;
                         }
@@ -227,13 +231,6 @@ void task_menu(void *pvParameters) {
                 system_config.fixed_index = !system_config.fixed_index;
             }
         }
-
-        if (system_config.menu == MENU_SD) {
-            if (input_data.device == BTN_SWITCH) {
-                system_config.sd_mounted = sd_card_alive();
-            }
-            continue;
-        }
     }
 }
 
@@ -265,7 +262,6 @@ void task_lcd_display(void *pvParameters) {
     static const char *main_options[] = {
         "Set Resistencia",
         "Control PID",
-        // "Reg Fuente",
         "INA219 (TEST)",
         "Set Tiempo",
         "Menu SD"
@@ -451,7 +447,6 @@ void task_pid_controller(void *pvParameters) {
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
         if (ina219_data.voltage_v >= MAX_VOLTAGE || ina219_data.current_a >= MAX_CURRENT || temp >= MAX_TEMP) {
             system_config.pid_enabled = false;
-
             pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY);
             system_config.menu = MENU_PROTECCION;
             if (ina219_data.voltage_v >= MAX_VOLTAGE) {
@@ -602,6 +597,14 @@ void task_datalogger(void *pvParameters) {
     datalogger_t *data_to_log = NULL;
     time_t current_time = {0};
     uint16_t aux_read = 0;
+    
+    time_t current_time;
+    i2c_guard_t guard_data = {
+        .device = I2C_RTC,
+        .queue = NULL,
+        .callback = rtc_get_time_rtos,
+        .param = (void *) &current_time
+    };
     
     while(1) {
         if (!USE_SERIAL_LOGGER && !system_config.sd_mounted) {
@@ -787,6 +790,8 @@ int main()
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
+
+    rtc_set_i2c(I2C_PORT);
 
     // Creacion de tareas
     xTaskCreate(
