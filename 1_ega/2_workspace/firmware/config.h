@@ -63,7 +63,7 @@
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
 
-#define USE_SERIAL_LOGGER 1
+#define USE_SERIAL_LOGGER 0
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
 
