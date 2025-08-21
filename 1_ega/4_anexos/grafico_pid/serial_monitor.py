@@ -7,7 +7,7 @@ PUERTO = 'COM8'   # En Windows sería COM3, COM4, etc.
 BAUDIOS = 115200          # Velocidad del microcontrolador
 
 # Nombre del archivo CSV con timestamp para no sobreescribir
-archivo_salida = "datos.csv"
+archivo_salida = "data/datos.csv"
 
 with serial.Serial(PUERTO, BAUDIOS, timeout=1) as ser, open(archivo_salida, 'w', newline='') as f:
     writer = csv.writer(f)
