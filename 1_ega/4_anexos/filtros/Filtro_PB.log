@@ -1,11 +1,11 @@
 LTspice 24.0.12 for Windows
 Circuit: * C:\Users\PabloPC\Documents\Github\2025_td3_512_gomez_pablo\1_ega\4_anexos\filtros\Filtro_PB.asc
-Start Time: Wed Aug 20 20:30:13 2025
+Start Time: Sat Aug 23 20:02:38 2025
 solver = Normal
 Maximum thread count: 6
 tnom = 27
 temp = 27
 method = modified trap
 Direct Newton iteration for .op point succeeded.
-Total elapsed time: 0.241 seconds.
+Total elapsed time: 1.290 seconds.
 
