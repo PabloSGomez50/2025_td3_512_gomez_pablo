@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "electronic_load")(type "KiCad")(uri "C:/Users/PabloPC/Documents/Github/2025_td3_512_gomez_pablo/1_ega/3_esquematico_pcb/electronic_load/electronic_load.pretty")(options "")(descr ""))
+)
