@@ -1,0 +1,149 @@
+(footprint "Heatsink_2725D"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(property "Reference" "REF**"
+		(at 0 -0.5 0)
+		(unlocked yes)
+		(layer "F.SilkS")
+		(uuid "0a6c8ee8-212b-4230-93c4-6ea705fc174b")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+		)
+	)
+	(property "Value" "Heatsink_2725D"
+		(at 0 1 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "31f32bf3-a204-44b6-a532-f88c7bc6f763")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "6eed262a-170a-4307-95b1-5c37f6ceffc6")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "bf76983b-65b9-4144-b01c-93c7462ec282")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(fp_line
+		(start -14.5 0)
+		(end -14.5 29)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "1bcfdfaa-a86e-4a25-adba-1d73438b931f")
+	)
+	(fp_line
+		(start -14.5 0)
+		(end 14.5 0)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "2797e24d-e72d-4c2c-8628-2785502a1dfd")
+	)
+	(fp_line
+		(start -14.5 29)
+		(end -13 29)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "F.CrtYd")
+		(uuid "80cb68e5-6552-49d4-82ab-af1f6846600a")
+	)
+	(fp_line
+		(start -13 1.5)
+		(end 13 1.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "f52df622-5428-4127-91f1-6f97e3d56e03")
+	)
+	(fp_line
+		(start -13 29)
+		(end -13 1.5)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "1de64865-46d3-46a5-a24f-a87471b10182")
+	)
+	(fp_line
+		(start 13 1.5)
+		(end 13 29)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "374479f6-1787-4603-9e3d-92170fcd0efb")
+	)
+	(fp_line
+		(start 13 29)
+		(end 14.5 29)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "F.CrtYd")
+		(uuid "aa22c0f8-5502-4c00-b135-ac205064c7b7")
+	)
+	(fp_line
+		(start 14.5 0)
+		(end 14.5 29)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "87d477f2-3a3b-48ef-b6b3-52dd63594d1f")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 2.5 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(uuid "0af701f3-e66a-4290-a613-115224923312")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(embedded_fonts no)
+)
