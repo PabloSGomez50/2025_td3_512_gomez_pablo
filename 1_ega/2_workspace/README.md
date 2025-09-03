@@ -6,5 +6,6 @@ En firmware, siempre ignorar directorio de archivos de compilación (_debug_ o _
 
 En este directorio ya está agregada la biblioteca de [freertos](./freertos) para implementar en el firmware.
 
-## Data Logger
-- 
+## Cambios propuestos
+- Agregar tarea de boton (debe activar y desactivar el GPIO GATE_ENABLE)
+- Pasar configuracion por parametros a tarea de menu, lcd y stop
