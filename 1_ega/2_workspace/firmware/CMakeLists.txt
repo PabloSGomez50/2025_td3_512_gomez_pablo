@@ -25,6 +25,8 @@ endif()
 # ====================================================================================
 set(PICO_BOARD pico2 CACHE STRING "Board type")
 
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g3")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
@@ -35,7 +37,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(firmware firmware.c )
+add_executable(firmware firmware.c)
 
 pico_set_program_name(firmware "firmware")
 pico_set_program_version(firmware "0.1")
@@ -53,6 +55,12 @@ add_subdirectory(
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../ina219 ${CMAKE_BINARY_DIR}/ina219
 )
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../rtc_ds3231 ${CMAKE_BINARY_DIR}/rtc_ds3231
+)
+add_subdirectory(
+    ${CMAKE_CURRENT_LIST_DIR}/../sd_card ${CMAKE_BINARY_DIR}/sd_card
+)
 
 # Add the standard library to the build
 target_link_libraries(
@@ -63,6 +71,8 @@ target_link_libraries(
     freertos
     lcd
     ina219
+    rtc_ds3231
+    sd_card
 )
 
 # Add the standard include files to the build

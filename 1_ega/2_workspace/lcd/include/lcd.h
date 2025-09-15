@@ -47,11 +47,18 @@
 #define MAX_LINES      2
 #define MAX_CHARS      16
 
+struct lcd_config {
+    i2c_inst_t *i2c;
+    uint8_t addr;
+};
+
 // Prototipos de funciones
 void lcd_clear(void);
 void lcd_set_cursor(int line, int position);
 void lcd_char(char val);
 void lcd_string(const char *s);
 void lcd_init(i2c_inst_t *i2c, uint8_t address);
+
+void lcd_init_rtos(void *param);
 
 #endif
