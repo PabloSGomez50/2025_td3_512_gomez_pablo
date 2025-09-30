@@ -3,7 +3,7 @@
 #include <linux/kernel.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
-#include "gpio_driver.h"
+// #include "gpio_driver.h"
 
 // Etiqueta para el autor del modulo
 #define AUTHOR "PABLO_GOMEZ-TP5"
@@ -13,31 +13,29 @@ static struct task_struct *thread1;
 // Puntero para segundo hilo
 static struct task_struct *thread2;
 
-uint8_t gpio_pin = 16;
+struct print_data_t {
+	uint16_t time;
+	char message[64];
+};
 
-static int thread_led_on_f(void *params) {
-	uint8_t gpio = *(uint8_t *)params;
-	
+// Saludo cada 500mS
+struct print_data_t thread1_data = {
+	.time = 500,
+	.message = "Hola desde el kernel!"
+};
+struct print_data_t thread2_data = {
+	.time = 500,
+	.message = "Chau desde el kernel!"
+};
+
+static int thread_print_data_f(void *params) {
+	struct print_data_t *data = (struct print_data_t *)params;
+
 	while(!kthread_should_stop()) {
 		// Mensaje para el Kernel
-		printk(KERN_INFO "%s: Encendiendo led en %d\n", AUTHOR, gpio);
-		gpio_set(gpio);
-		// Demora
-		msleep(1000);
-	}
-	return 0;
-}
-
-static int thread_led_off_f(void *params) {
-	uint8_t gpio = *(uint8_t *)params;
-
-	msleep(500);
-	while(!kthread_should_stop()) {
-		// Mensaje para el Kernel
-		printk(KERN_INFO "%s: Apagando led en %d\n", AUTHOR, gpio);
-		gpio_clr(gpio);
-		// Demora
-		msleep(1000);
+		printk(KERN_INFO "%s: %s\n", AUTHOR, data->message);
+		// Demora de 500 mS
+		msleep(data->time);
 	}
 	return 0;
 }
@@ -48,22 +46,14 @@ static int thread_led_off_f(void *params) {
 */
 static int __init kernel_module_init(void) {
 	printk(KERN_INFO "%s: Inicio de programa!\n", AUTHOR);
-	
-	void __iomem* map_addr = gpio_map();
-	if (!map_addr) {
-		printk(KERN_ERR "%s: No se pudo mapear la memoria\n", AUTHOR);
-		return -1;
-	}
-	printk(KERN_INFO "%s: Memoria mapeada en %p\n", AUTHOR, map_addr);
-	gpio_set_dir_output(gpio_pin);
 
-	thread1 = kthread_run(thread_led_on_f, &gpio_pin, "thread1");
+	thread1 = kthread_run(thread_print_data_f, &thread1_data, "thread1");
 	if (IS_ERR(thread1)) {
 		printk(KERN_ERR "%s: Error al crear thread 1\n", AUTHOR);
 		return -1;
 	}
 
-	thread2 = kthread_run(thread_led_off_f, &gpio_pin, "thread2");
+	thread2 = kthread_run(thread_print_data_f, &thread2_data, "thread2");
 	if (IS_ERR(thread2)) {
 		printk(KERN_ERR "%s: Error al crear thread 2\n", AUTHOR);
 		// Frenar el hilo 1
@@ -80,8 +70,6 @@ static int __init kernel_module_init(void) {
 static void __exit kernel_module_exit(void) {
 	// Salida del modulo
 	printk(KERN_INFO "%s: Limpiando los recursos!\n", AUTHOR);
-	gpio_clr(gpio_pin);
-	gpio_unmap();
 	if (thread1) {
 		kthread_stop(thread1);
 	}
@@ -89,7 +77,6 @@ static void __exit kernel_module_exit(void) {
 	if (thread2) {
 		kthread_stop(thread2);
 	}
-	printk(KERN_INFO "%s: Hilos detenidos!\n", AUTHOR);
 }
 
 // Registro la funcion de inicializacion y salida
