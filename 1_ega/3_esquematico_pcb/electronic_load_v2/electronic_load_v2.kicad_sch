@@ -6218,12 +6218,12 @@
 		(uuid "e451b041-ea3a-491d-925b-600ab4d93a4c")
 	)
 	(no_connect
-		(at 77.47 54.61)
-		(uuid "ecb2a307-3cbf-4f6c-9d7b-f967a9612c13")
-	)
-	(no_connect
 		(at 77.47 69.85)
 		(uuid "f319576a-7cb1-4056-b589-be6a87556a95")
+	)
+	(no_connect
+		(at 77.47 77.47)
+		(uuid "f76c17d3-b148-4785-91f1-95596587a43e")
 	)
 	(wire
 		(pts
@@ -8863,7 +8863,7 @@
 	)
 	(global_label "I2C_SDA"
 		(shape input)
-		(at 77.47 74.93 0)
+		(at 77.47 54.61 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -8873,7 +8873,7 @@
 		)
 		(uuid "6f129c75-0998-4445-a697-ab5a45b3e940")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 88.0752 74.93 0)
+			(at 88.0752 54.61 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -9325,7 +9325,7 @@
 	)
 	(global_label "TEMP_DIODE"
 		(shape input)
-		(at 77.47 77.47 0)
+		(at 77.47 74.93 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -9335,7 +9335,7 @@
 		)
 		(uuid "d1ddcef7-b6a6-4982-8f4e-27dd39057981")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 91.8851 77.47 0)
+			(at 91.8851 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
