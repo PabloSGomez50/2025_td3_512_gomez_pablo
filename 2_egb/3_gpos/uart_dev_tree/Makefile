@@ -22,7 +22,8 @@ build-devtree:
 	@dtc -@ -I dts -O dtb -o build/$(DEV_TREE).dtbo $(DEV_TREE).dts
 
 load-devtree:
-	@sudo cp build/${DEV_TREE}.dtbo /boot/overlays/
+	@sudo cp build/${DEV_TREE}.dtbo /boot/firmware/overlays/
+	@sudo dtoverlay ${DEV_TREE}
 
 unload-devtree:
 	@sudo dtoverlay -r ${DEV_TREE}
