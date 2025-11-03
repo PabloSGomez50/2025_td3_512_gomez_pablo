@@ -378,7 +378,13 @@ void task_pid_controller(void *pid_params) {
     int16_t pendiente = 0;
     uint16_t target_steps = 0;
     uint16_t steps = 0;
-
+    
+    if (sys_conf.pid_time_ms > 0) {
+        r_target = MAXIMUM_RESISTANCE;
+        target_steps = sys_conf.pid_time_ms / CONTROLLER_REFRESH_MS;
+        pendiente = (sys_conf.resistance_target - r_target) / target_steps;
+    }
+    
     uint16_t pwm_value = 0;
     float current_target_ma = 0;
     float error = 0;
@@ -388,7 +394,7 @@ void task_pid_controller(void *pid_params) {
     float kp = Kp;
     float ki = Ki;
     float kd = Kd;
-    
+
     const float dt = CONTROLLER_REFRESH_MS / 1000.0f;
     
     TickType_t ticks = xTaskGetTickCount();
@@ -405,26 +411,13 @@ void task_pid_controller(void *pid_params) {
         //     continue;
         // }
 
-        if (pid_start) {
-            steps = 0;
-            if (sys_conf.pid_time_ms > 0) {
-                r_target = MAXIMUM_RESISTANCE;
-                target_steps = sys_conf.pid_time_ms / CONTROLLER_REFRESH_MS;
-                pendiente = (sys_conf.resistance_target - r_target) / target_steps;
-            } else {
-                pendiente = 0;
-                target_steps = 0;
-                r_target = sys_conf.resistance_target;
-            }
+        if (steps < target_steps) {
+            r_target += pendiente;
+            steps++;
         } else {
-            if (steps < target_steps) {
-                r_target += pendiente;
-                steps++;
-            } else {
-                r_target = sys_conf.resistance_target;
-            }
+            r_target = sys_conf.resistance_target;
         }
-        pid_start = false;
+
         if (r_target >= 1000) {
             kp = Kp * 2.0f;
         } else if (r_target >= 350) {
@@ -770,9 +763,13 @@ int main()
         &btn_data_2, 4, NULL
     );
     xTaskCreate(
-        task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+        task_protection, "task_protection", configMINIMAL_STACK_SIZE * 2,
         NULL, 4, NULL
     );
+    // xTaskCreate(
+    //     task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+    //     NULL, 4, NULL
+    // );
     xTaskCreate(
         task_i2c_guard, "task_i2c_guard", configMINIMAL_STACK_SIZE * 3,
         NULL, 4, NULL
@@ -827,7 +824,6 @@ void btn_irq_handler(uint gpio, uint32_t events) {
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         return;
     }
-
     gpio_set_irq_enabled(gpio, events, false);
 
     if (gpio == BTN_SWITCH_GPIO) {

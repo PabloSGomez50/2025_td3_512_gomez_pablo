@@ -1,8 +1,7 @@
-# Etiqueta para definir el nombre del archivo con el codigo del modulo
-FILE := kernel_module
-DEV_TREE := uart0-pi5-overlay
+# Etiqueta para definir el nombre del archivo con el codigo del modulo             FILE := kernel_module
+DEV_TREE := uart0-egb
 # Define el autor del modulo (coincide con el del codigo del modulo)
-AUTHOR := Hernandez-Jorja
+AUTHOR := td3_2025
 # Directorio donde se encuentra el kernel
 KDIR := /lib/modules/$(shell uname -r)/build
 # Directorio destino de archivos de compilacion

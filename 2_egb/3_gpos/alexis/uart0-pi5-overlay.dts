@@ -8,7 +8,7 @@
 		target = <&uart0>;
 		__overlay__ {
 			egb_uart: egb_uart@0 {
-				compatible = "Her_Jorj,egb";
+				compatible = "td3,egb_uart";
 				status = "okay";
 			};
 		};
