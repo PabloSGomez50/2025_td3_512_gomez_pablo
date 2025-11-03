@@ -46,6 +46,9 @@ pico_set_program_version(firmware "0.1")
 pico_enable_stdio_uart(firmware 0)
 pico_enable_stdio_usb(firmware 1)
 
+# Habilito uso de memoria dinámica
+set(FREERTOS_SUPPORT_DYNAMIC_ALLOCATION "ON" CACHE PATH "FreeRTOS dynamic memory implementation support")
+
 add_subdirectory(
     ${CMAKE_CURRENT_LIST_DIR}/../freertos ${CMAKE_BINARY_DIR}/freertos
 )

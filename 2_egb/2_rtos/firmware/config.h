@@ -45,7 +45,7 @@
 #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
 #define PWM_OFF (MIN_PWM_DUTY - (MAX_PWM_WRAP / 500))
 
-#define PID_STATUS_PIN 15
+#define PID_ENABLE_PIN 15
 #define PWM_PIN 16
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define MAX_TEMP 130.0f
@@ -127,15 +127,13 @@ typedef struct {
     menu_t menu;
     uint8_t index;
     bool fixed_index;
-    bool sd_mounted;
-    uint8_t sd_file_count;
 
-    bool pid_enabled;
     uint16_t pid_time_ms;
     uint16_t pwm_value;
   
     uint16_t resistance_target;
     int16_t resistance_adj;
+    uint8_t r_index;
 } system_config_t;
 
 typedef struct {
@@ -157,12 +155,6 @@ typedef struct {
     float temperature;
 } datalogger_t;
 
-typedef struct {
-    uint16_t pid_time_ms;
-    uint16_t r_target;
-    uint8_t r_step_idx;
-} config_t;
-
 typedef enum {
     CONFIG_FILE,
     LOG_FILE
@@ -175,7 +167,7 @@ typedef struct {
 } sd_event_t;
 
 const char file_header[] = "Voltage;Current;PWM Value;Error;Integral;Derivative;R_Target;Temperature\n";
-const uint8_t r_steps[] = {1, 10, 50, 100, 250};
+const uint8_t R_STEPS[] = {1, 10, 50, 100, 250};
 
 void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);
@@ -186,6 +178,8 @@ void task_ina219(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 void task_rtc(void *pvParameters);
+
+void task_btn_stop_pull_up(void *pvParameters);
 
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
