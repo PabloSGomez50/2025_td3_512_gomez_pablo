@@ -7,9 +7,9 @@
 	fragment@0 {
 		target = <&uart0>;
 		__overlay__ {
-			egb_uart: egb_uart@0 {
-				compatible = "td3,egb_uart";
-				status = "okay";
+			status = "okay";
+			egb_uart: egb_uart {
+				compatible = "pablo,egb";
 			};
 		};
 	};

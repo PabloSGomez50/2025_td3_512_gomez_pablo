@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "hardware/i2c.h"
+#include "hardware/uart.h"
+#include "hardware/irq.h"
 
 #include "FreeRTOS.h"
 #include "task.h"

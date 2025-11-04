@@ -26,6 +26,7 @@ QueueHandle_t queue_sd_card;
 QueueHandle_t queue_temp;
 
 TaskHandle_t task_rtc_handle;
+TaskHandle_t task_pid_handle;
 
 uint8_t enable_index = 0;
 
@@ -143,12 +144,15 @@ void task_menu(void *pvParameters) {
 
         if (sys_conf.menu == MENU_TEST) {
             if (input_data.device == ENCODER) {
-                int16_t aux_wrap = (sys_conf.pwm_value + (input_data.increment ? 50 : -5));
+                int16_t aux_wrap = (sys_conf.pwm_value + (input_data.increment ? 25 : -5));
                 if (aux_wrap > MAX_PWM_DUTY) {
                     aux_wrap = MAX_PWM_DUTY;
                 }
-                if (aux_wrap < 0) {
-                    aux_wrap = 0;
+                if (aux_wrap < MIN_PWM_DUTY) {
+                    aux_wrap = MIN_PWM_DUTY;
+                    gpio_put(PID_ENABLE_PIN, false);
+                } else {
+                    gpio_put(PID_ENABLE_PIN, true);
                 }
                 sys_conf.pwm_value = aux_wrap;
             }
@@ -366,23 +370,21 @@ void task_pid_controller(void *pid_params) {
     };
     uint16_t datalogger_index = 0;
     time_t current_time;
-
     float temp;
-
-    // Configuración del PWM
     ina219_data_t ina219_data;
-    uint8_t stable_iters = 0;
-    
-    bool pid_start = true;
-    uint16_t r_target = sys_conf.resistance_target;
+
+    pid_config_t pid_conf = *(pid_config_t *) pid_params;
+    // Configuración del PWM
+    uint16_t r_target = pid_conf.r_target;
     int16_t pendiente = 0;
     uint16_t target_steps = 0;
     uint16_t steps = 0;
+    uint8_t stable_steps = 0;
     
     if (sys_conf.pid_time_ms > 0) {
         r_target = MAXIMUM_RESISTANCE;
         target_steps = sys_conf.pid_time_ms / CONTROLLER_REFRESH_MS;
-        pendiente = (sys_conf.resistance_target - r_target) / target_steps;
+        pendiente = (pid_conf.r_target - r_target) / target_steps;
     }
     
     uint16_t pwm_value = 0;
@@ -391,9 +393,6 @@ void task_pid_controller(void *pid_params) {
     float last_error = 0.0f;
     float integral_value = 0;
     float derivative_value = 0;
-    float kp = Kp;
-    float ki = Ki;
-    float kd = Kd;
 
     const float dt = CONTROLLER_REFRESH_MS / 1000.0f;
     
@@ -415,34 +414,34 @@ void task_pid_controller(void *pid_params) {
             r_target += pendiente;
             steps++;
         } else {
-            r_target = sys_conf.resistance_target;
+            r_target = pid_conf.r_target;
         }
 
-        if (r_target >= 1000) {
-            kp = Kp * 2.0f;
-        } else if (r_target >= 350) {
-            kp = Kp * 1.5f;
-        } else if (r_target >= 150) {
-            kp = Kp * 1.0f;
-        } else if (r_target >= 60) {
-            kp = Kp * 0.6f;
-        } else  {
-            kp = Kp * 0.2f;
-        }
+        // if (r_target >= 1000) {
+        //     kp = Kp * 2.0f;
+        // } else if (r_target >= 350) {
+        //     kp = Kp * 1.5f;
+        // } else if (r_target >= 150) {
+        //     kp = Kp * 1.0f;
+        // } else if (r_target >= 60) {
+        //     kp = Kp * 0.6f;
+        // } else  {
+        //     kp = Kp * 0.2f;
+        // }
         current_target_ma = 1000.0f * ina219_data.voltage_v / (float) r_target;
 
         error = current_target_ma - (ina219_data.current_a * 1000.0f);
         if (fabsf(error / current_target_ma) <= 0.05f) {
-            integral_value += error * dt / ki;
+            integral_value += error * dt / pid_conf.ki;
             derivative_value = 0.0f;
-            stable_iters++;
+            stable_steps++;
         } else {
             if (last_error == 0)
                 derivative_value = 0.0f;
             else 
-                derivative_value = kd * (error - last_error) / dt;
+                derivative_value = pid_conf.kd * (error - last_error) / dt;
             integral_value = 0.0f;
-            stable_iters = 0;
+            stable_steps = 0;
         }
 
         if (integral_value > MAX_INTEGRAL_VALUE) {
@@ -459,19 +458,19 @@ void task_pid_controller(void *pid_params) {
         }
         
         int16_t delta_duty = (int16_t) (
-            kp * error +
+            pid_conf.kp * error +
             derivative_value +
             integral_value
         );
         last_error = error;
-        int32_t temp_pwm = (int32_t)sys_conf.pwm_value + delta_duty;
+        if (sys_conf.pwm_value + delta_duty > MAX_PWM_DUTY) {
+            sys_conf.pwm_value = MAX_PWM_DUTY;
+        } else {
+            sys_conf.pwm_value += delta_duty;
+        }
+        if (sys_conf.pwm_value < MIN_PWM_DUTY) sys_conf.pwm_value = MIN_PWM_DUTY;
 
-        if (temp_pwm < MIN_PWM_DUTY) temp_pwm = MIN_PWM_DUTY;
-        if (temp_pwm > MAX_PWM_DUTY) temp_pwm = MAX_PWM_DUTY;
-
-        sys_conf.pwm_value = (uint16_t)temp_pwm;
         pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
-
 
         datalogger_ptr[datalogger_index] = (datalogger_t) {
             .voltage_v = ina219_data.voltage_v,
@@ -483,7 +482,7 @@ void task_pid_controller(void *pid_params) {
             .r_target = r_target,
             .temperature = temp
         };
-        if ((stable_iters > 10 && datalogger_index > LOGGER_MIN_SEND) || datalogger_index >= LOGGER_CHUNK_SIZE - 1) {
+        if ((stable_steps > 10 && datalogger_index > LOGGER_MIN_SEND) || datalogger_index >= LOGGER_CHUNK_SIZE - 1) {
             sd_event.chunk_index = datalogger_index;
             if (xQueueSend(queue_sd_card, &sd_event, 0) == pdTRUE) {
                 datalogger_index = 0;
@@ -813,6 +812,8 @@ int main()
     while(true);
 }
 
+
+void uart_irq_handler()
 
 void btn_irq_handler(uint gpio, uint32_t events) {
     static BaseType_t xHigherPriorityTaskWoken = pdFALSE;

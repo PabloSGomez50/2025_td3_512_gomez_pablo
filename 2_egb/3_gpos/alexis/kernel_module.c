@@ -11,7 +11,7 @@
 #include <linux/wait.h>
 
 // Autor del modulo
-#define AUTHOR              "td3_2025"
+#define AUTHOR              "pablo_gomez"
 // Nombre del char device
 #define CHRDEV_NAME         "egb"
 // Minor number del char device
@@ -33,7 +33,7 @@ static struct cdev chrdev;
 static struct class *chrdev_class;
 // ID
 static struct of_device_id serdev_ids[] = {
-    {.compatible = "td3,egb_uart", },
+    {.compatible = "pablo,egb", },
     {}
 };
 MODULE_DEVICE_TABLE(of, serdev_ids);
@@ -80,15 +80,20 @@ static const struct serdev_device_ops egb_uart_ops = {
  */
 static ssize_t chr_dev_read(struct file *f, char __user *buff, size_t size, loff_t *off) {
     int not_copied;
-    if(*off >= recibido_size) {
+    // Si el usuario ya leyo un dato terminamos la lectura
+    if(*off > 0) {
         printk(KERN_INFO "%s: Termino de leer\n", AUTHOR);
-	return 0;
+	    return 0;
     }
+    // Bloqueamos hasta recibir dato por UART
     wait_event_interruptible(waitqueue, recibido == 1);
+    // Copiamos al usuario
     not_copied = copy_to_user(buff, shared_buffer, recibido_size);
+    // Actualizamos el offset
     *off = recibido_size - not_copied;
+    // Limpiamos el flag para volver a bloquear
     recibido = 0;
-    printk(KERN_INFO "%s: Leido del char device\n", AUTHOR);
+    printk(KERN_INFO "%s: Leido del char device '%s'\n", AUTHOR, shared_buffer);
     return recibido_size - not_copied;
 }
 

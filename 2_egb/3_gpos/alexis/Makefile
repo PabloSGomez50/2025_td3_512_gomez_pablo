@@ -1,7 +1,8 @@
-# Etiqueta para definir el nombre del archivo con el codigo del modulo             FILE := kernel_module
+# Etiqueta para definir el nombre del archivo con el codigo del modulo
+FILE := kernel_module
 DEV_TREE := uart0-egb
 # Define el autor del modulo (coincide con el del codigo del modulo)
-AUTHOR := td3_2025
+AUTHOR := pablo_gomez
 # Directorio donde se encuentra el kernel
 KDIR := /lib/modules/$(shell uname -r)/build
 # Directorio destino de archivos de compilacion
