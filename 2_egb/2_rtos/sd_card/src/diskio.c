@@ -6,10 +6,10 @@
 #include "hardware/spi.h"
 
 #define SPI_PORT spi0
-#define PIN_MISO 4
-#define PIN_CS   1
-#define PIN_SCK  2
-#define PIN_MOSI 3
+#define PIN_MISO 5
+#define PIN_CS   8
+#define PIN_SCK  6
+#define PIN_MOSI 7
 
 #define CS_H() gpio_put(PIN_CS, 1)
 #define CS_L() gpio_put(PIN_CS, 0)

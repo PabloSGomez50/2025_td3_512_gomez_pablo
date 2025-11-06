@@ -24,6 +24,10 @@ QueueHandle_t queue_input_data;
 QueueHandle_t queue_rtc_time;
 QueueHandle_t queue_sd_card;
 QueueHandle_t queue_temp;
+QueueHandle_t queue_uart_rx;
+
+/* Mutex para proteger escritura en UART desde distintas tareas */
+SemaphoreHandle_t uart_tx_mutex;
 
 TaskHandle_t task_rtc_handle;
 TaskHandle_t task_pid_handle;
@@ -61,6 +65,7 @@ void task_menu(void *pvParameters) {
             sys_conf.index = 0;
             sys_conf.fixed_index = false;
             vTaskResume(task_rtc_handle);
+            xSemaphoreGive(bin_btn_2);
             continue;
         }
 
@@ -150,11 +155,9 @@ void task_menu(void *pvParameters) {
                 }
                 if (aux_wrap < MIN_PWM_DUTY) {
                     aux_wrap = MIN_PWM_DUTY;
-                    gpio_put(PID_ENABLE_PIN, false);
-                } else {
-                    gpio_put(PID_ENABLE_PIN, true);
                 }
                 sys_conf.pwm_value = aux_wrap;
+                pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
             }
             continue;
         }
@@ -500,11 +503,11 @@ void task_pid_controller(void *pid_params) {
 
 void task_protection(void * pvParameters) {
     ina219_data_t ina219_data;
-    float temp;
+    float temp = 25.0f;
 
     while(1) {
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
-        xQueuePeek(queue_temp, &temp, portMAX_DELAY);
+        // xQueuePeek(queue_temp, &temp, portMAX_DELAY);
         if (ina219_data.voltage_v >= MAX_VOLTAGE || ina219_data.current_a >= MAX_CURRENT || temp >= MAX_TEMP) {
             pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY);
             gpio_put(PID_ENABLE_PIN, false);
@@ -720,6 +723,18 @@ int main()
         printf("Error al crear la cola de temperatura\n");
         return -1;
     }
+    // Cola y mutex para manejo de UART
+    queue_uart_rx = xQueueCreate(5, RX_BUFFER_SIZE);
+    if (queue_uart_rx == NULL) {
+        printf("Error al crear la cola UART RX\n");
+        return -1;
+    }
+
+    uart_tx_mutex = xSemaphoreCreateMutex();
+    if (uart_tx_mutex == NULL) {
+        printf("Error al crear el mutex UART TX\n");
+        return -1;
+    }
     
     bin_btn_1 = xSemaphoreCreateBinary();
     bin_btn_2 = xSemaphoreCreateBinary();
@@ -808,12 +823,78 @@ int main()
         NULL, 1, &task_rtc_handle
     );
 
+    // Tarea para procesar comandos UART
+    // xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 2,
+    //     NULL, 1, NULL
+    // );
+
     vTaskStartScheduler();
     while(true);
 }
 
 
-void uart_irq_handler()
+void uart_irq_handler() {
+    static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    static char rx_buffer[RX_BUFFER_SIZE];
+    static size_t rx_index = 0;
+    // Leer todos los bytes disponibles
+    while (uart_is_readable(UART_ID)) {
+        uint8_t ch = uart_getc(UART_ID);
+        // Si es fin de linea, terminar string y encolar para que la tarea la procese
+        if (ch == '\n' || ch == '\r') {
+            rx_buffer[rx_index] = '\0'; // Terminar la cadena
+            if (queue_uart_rx != NULL) {
+                // xQueueSendFromISR copia el contenido de rx_buffer hacia el almacenamiento interno de la cola
+                xQueueSendFromISR(queue_uart_rx, rx_buffer, &xHigherPriorityTaskWoken);
+            }
+            rx_index = 0; // Reiniciar el indice para el siguiente comando
+        } else {
+            if (rx_index < RX_BUFFER_SIZE - 1) {
+                rx_buffer[rx_index++] = ch; // Almacenar el caracter en el buffer
+            }
+        }
+    }
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+void task_uart(void *pvParameters) {
+    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+    // Configurar la UART
+    uart_init(UART_ID, UART_BAUD_RATE);
+    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+    uart_set_hw_flow(UART_ID, false, false);
+
+    uart_set_fifo_enabled(UART_ID, false);
+
+    // Habilitar interrupciones de la UART (la ISR encola líneas completas)
+    uart_set_irq_enables(UART_ID, true, false);
+    irq_set_exclusive_handler(UART_IRQ, uart_irq_handler);
+    irq_set_enabled(UART_IRQ, true);
+
+    // Buffer temporal para recibir comandos desde la cola
+    char cmd_buf[RX_BUFFER_SIZE];
+    if (queue_uart_rx == NULL) {
+        printf("Error: La cola de UART RX no está inicializada.\n");
+        vTaskDelete(NULL);
+    }
+    if (uart_tx_mutex == NULL) {
+        printf("Error: El mutex de UART TX no está inicializado.\n");
+        vTaskDelete(NULL);
+    }
+    while (1) {
+        if (xQueueReceive(queue_uart_rx, cmd_buf, portMAX_DELAY) == pdTRUE) {
+            // Proteger escrituras por UART (respuesta/ack) con el mutex
+            if (xSemaphoreTake(uart_tx_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
+                // process_command(cmd_buf);
+                uart_puts(UART_ID, "TX: ");
+                uart_puts(UART_ID, cmd_buf);
+                uart_putc(UART_ID, '\n');
+                xSemaphoreGive(uart_tx_mutex);
+            }
+        }
+    }
+}
 
 void btn_irq_handler(uint gpio, uint32_t events) {
     static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -876,7 +957,7 @@ void task_encoder(void *pvParameters) {
 
 void task_btn_stop_pull_up(void *pvParameters) {
     btn_data_t * btn_data = (btn_data_t *) pvParameters;
-    bool pid_running = false;
+    // bool pid_running = false;
     gpio_init(btn_data->gpio);
     gpio_set_dir(btn_data->gpio, GPIO_IN);
     gpio_pull_up(btn_data->gpio);
@@ -887,7 +968,13 @@ void task_btn_stop_pull_up(void *pvParameters) {
         xSemaphoreTake(*btn_data->sem_bin, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
         // Accion al presionar el boton
-        pid_running ^= true;
+        sys_conf.pwm_value = MIN_PWM_DUTY;
+        if (gpio_get(PID_ENABLE_PIN)) {
+            gpio_put(PID_ENABLE_PIN, false);
+            pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
+        } else {
+            gpio_put(PID_ENABLE_PIN, true);
+        }
         // Espera a que se suelte el boton
         if (!gpio_get(btn_data->gpio)) {
             gpio_set_irq_enabled(btn_data->gpio, GPIO_IRQ_EDGE_RISE, true);

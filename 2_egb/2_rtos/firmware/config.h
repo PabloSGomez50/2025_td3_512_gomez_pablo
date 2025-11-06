@@ -27,28 +27,28 @@
 
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
-#define BTN_MENU_GPIO 6
-#define BTN_STOP_GPIO 7
-#define BTN_SWITCH_GPIO 14
+#define BTN_MENU_GPIO 2
+#define BTN_STOP_GPIO 4
+#define BTN_SWITCH_GPIO 13
 #define MAX_MENU_NUM 2
 
-#define ENC_CHA_GPIO 12
-#define ENC_CHB_GPIO 13
+#define ENC_CHA_GPIO 15
+#define ENC_CHB_GPIO 14
 #define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
 #define PWM_GAIN 1.372f
-#define MAX_PWM_WRAP 12000
+#define MAX_PWM_WRAP 4096
 
 #define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN)
 #define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
-#define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
-#define PWM_OFF (MIN_PWM_DUTY - (MAX_PWM_WRAP / 500))
+// #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+#define MIN_PWM_DUTY 20U
 
-#define PID_ENABLE_PIN 15
-#define PWM_PIN 16
+#define PID_ENABLE_PIN 16
+#define PWM_PIN 17
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define MAX_TEMP 130.0f
 #define INA219_MAX_CURRENT 0.38f
@@ -68,6 +68,13 @@
 #define USE_SERIAL_LOGGER 0
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
+
+// EGB - UART
+#define UART_ID uart0
+#define UART_BAUD_RATE 115200
+#define UART_TX_PIN 0
+#define UART_RX_PIN 1
+#define RX_BUFFER_SIZE 64
 
 typedef struct {
     uint16_t year;
