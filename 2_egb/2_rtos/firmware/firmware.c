@@ -1,14 +1,5 @@
-#include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "hardware/i2c.h"
-#include "hardware/adc.h"
-#include "hardware/pwm.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
-#include "semphr.h"
 
 #include "config.h"
 
@@ -41,10 +32,19 @@ system_config_t sys_conf = {
     .menu = MENU_MAIN,
     .index = 0,
     .fixed_index = false,
-    .pid_time_ms = 0,
-    .resistance_target = 300,
     .r_index = 1
 };
+
+pid_config_t pid_conf = {
+    .kp = 8.2f,
+    .ki = 0.032f,
+    .kd = 0.035f,
+    .ki_limit = 5.0f,
+    .kd_limit = 10.0f,
+    .pid_time_ms = 0,
+    .resistance_target = 300
+};
+
 
 void task_menu(void *pvParameters) {
     input_data_t input_data = {0};
@@ -86,7 +86,7 @@ void task_menu(void *pvParameters) {
                         break;
                 }
                 sys_conf.fixed_index = false;
-                sys_conf.resistance_adj = sys_conf.resistance_target;
+                sys_conf.resistance_adj = pid_conf.resistance_target;
             }
             continue;
         }
@@ -114,10 +114,10 @@ void task_menu(void *pvParameters) {
                         wrap_index(&sys_conf.r_index, 5, input_data.increment);
                         break;
                     case 2:
-                        sys_conf.pid_time_ms += input_data.increment ? 500 : -500;
+                        pid_conf.pid_time_ms += input_data.increment ? 500 : -500;
 
-                        if (sys_conf.pid_time_ms < 0 || sys_conf.pid_time_ms > 50000) {
-                            sys_conf.pid_time_ms = 0;
+                        if (pid_conf.pid_time_ms < 0 || pid_conf.pid_time_ms > MAX_TIME_TARGET) {
+                            pid_conf.pid_time_ms = 0;
                         }
                         break;
                 }
@@ -128,7 +128,7 @@ void task_menu(void *pvParameters) {
                     if (sys_conf.index == 3) {
                         sys_conf.index = 0;
                         sys_conf.menu = MENU_PID;
-                        sys_conf.resistance_target = sys_conf.resistance_adj;
+                        pid_conf.resistance_target = sys_conf.resistance_adj;
                         sys_conf.fixed_index = false;
                         continue;
                     }
@@ -261,7 +261,7 @@ void task_lcd_display(void *pvParameters) {
                     (sys_conf.index == 1 & blink_state) ? '>' : ' ',
                     R_STEPS[sys_conf.r_index]
                 );
-                if (sys_conf.pid_time_ms == 0) {
+                if (pid_conf.pid_time_ms == 0) {
                     snprintf(line2, max_format_chars, "%cT: u(t) %cSig.",
                         (sys_conf.index == 2 & blink_state) ? '>' : ' ',
                         (sys_conf.index == 3 & blink_state) ? '>' : ' '
@@ -269,7 +269,7 @@ void task_lcd_display(void *pvParameters) {
                 } else {
                     snprintf(line2, max_format_chars, "%cT:%4.1f s%cSig.",
                         (sys_conf.index == 2 & blink_state) ? '>' : ' ',
-                        sys_conf.pid_time_ms / 1000.0f,
+                        pid_conf.pid_time_ms / 1000.0f,
                         (sys_conf.index == 3 & blink_state) ? '>' : ' '
                     );
                 }
@@ -278,7 +278,7 @@ void task_lcd_display(void *pvParameters) {
                 xQueuePeek(queue_ina219_data, &ina219_data, 1);
                 xQueuePeek(queue_temp, &temp_c, 1);
                 snprintf(line1, max_format_chars, "R:%4d|%4d|E:%c",
-                    sys_conf.resistance_target,
+                    pid_conf.resistance_target,
                     (uint16_t) (ina219_data.voltage_v / ina219_data.current_a),
                     gpio_get(PID_ENABLE_PIN) ? 'X' : ' '
                 );
@@ -376,21 +376,20 @@ void task_pid_controller(void *pid_params) {
     float temp;
     ina219_data_t ina219_data;
 
-    pid_config_t pid_conf = *(pid_config_t *) pid_params;
+    pid_config_t params = *(pid_config_t *) pid_params;
     // Configuración del PWM
-    uint16_t r_target = pid_conf.r_target;
+    uint16_t r_target = params.resistance_target;
     int16_t pendiente = 0;
     uint16_t target_steps = 0;
     uint16_t steps = 0;
     uint8_t stable_steps = 0;
     
-    if (sys_conf.pid_time_ms > 0) {
+    if (params.pid_time_ms > 0) {
         r_target = MAXIMUM_RESISTANCE;
-        target_steps = sys_conf.pid_time_ms / CONTROLLER_REFRESH_MS;
-        pendiente = (pid_conf.r_target - r_target) / target_steps;
+        target_steps = params.pid_time_ms / CONTROLLER_REFRESH_MS;
+        pendiente = (params.resistance_target - r_target) / target_steps;
     }
     
-    uint16_t pwm_value = 0;
     float current_target_ma = 0;
     float error = 0;
     float last_error = 0.0f;
@@ -405,21 +404,12 @@ void task_pid_controller(void *pid_params) {
         xQueuePeek(queue_temp, &temp, portMAX_DELAY);
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
 
-        // if (sys_conf.menu == MENU_TEST) {
-        //     if (sys_conf.pwm_value >= MIN_PWM_DUTY && sys_conf.pwm_value <= MAX_PWM_DUTY) {
-        //         pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
-        //         gpio_put(PID_STATUS_PIN, true);
-        //     }
-        //     continue;
-        // }
-
         if (steps < target_steps) {
             r_target += pendiente;
             steps++;
         } else {
-            r_target = pid_conf.r_target;
+            r_target = pid_conf.resistance_target;
         }
-
         // if (r_target >= 1000) {
         //     kp = Kp * 2.0f;
         // } else if (r_target >= 350) {
@@ -435,31 +425,20 @@ void task_pid_controller(void *pid_params) {
 
         error = current_target_ma - (ina219_data.current_a * 1000.0f);
         if (fabsf(error / current_target_ma) <= 0.05f) {
-            integral_value += error * dt / pid_conf.ki;
+            integral_value += error * dt / params.ki;
             derivative_value = 0.0f;
             stable_steps++;
         } else {
             if (last_error == 0)
                 derivative_value = 0.0f;
             else 
-                derivative_value = pid_conf.kd * (error - last_error) / dt;
+                derivative_value = params.kd * (error - last_error) / dt;
             integral_value = 0.0f;
             stable_steps = 0;
         }
 
-        if (integral_value > MAX_INTEGRAL_VALUE) {
-            integral_value = MAX_INTEGRAL_VALUE;
-        }
-        else if (integral_value < -MAX_INTEGRAL_VALUE) {
-            integral_value = -MAX_INTEGRAL_VALUE;
-        }
-        if (derivative_value > MAX_DERIVATIVE_VALUE) {
-            derivative_value = MAX_DERIVATIVE_VALUE;
-        }
-        else if (derivative_value < -MAX_DERIVATIVE_VALUE) {
-            derivative_value = -MAX_DERIVATIVE_VALUE;
-        }
-        
+        limit_float(&integral_value, params.ki_limit);
+        limit_float(&derivative_value, params.kd_limit);
         int16_t delta_duty = (int16_t) (
             pid_conf.kp * error +
             derivative_value +
@@ -581,7 +560,7 @@ void task_datalogger(void *pvParameters) {
                 char *token = strtok(buffer, ";");
                 while (token != NULL) {
                     if (sscanf(token, "PID time: %d", &aux_read) == 1) {
-                        sys_conf.pid_time_ms = aux_read;
+                        pid_conf.pid_time_ms = aux_read;
                     }
                     else if (sscanf(token, "R Target: %d", &aux_read) == 1) {
                         if (aux_read >= MINIMUM_RESISTANCE && aux_read <= MAXIMUM_RESISTANCE) {
@@ -624,8 +603,8 @@ void task_datalogger(void *pvParameters) {
             xQueuePeek(queue_rtc_time, &current_time, portMAX_DELAY);
             snprintf(filename, sizeof(filename), "log-%04d_%02d_%02d-%03d_%02d__%.2f_%.2f_%.2f.csv",
                 current_time.year, current_time.month, current_time.day,
-                sys_conf.resistance_target, enable_index,
-                Kp, Ki, Kd
+                pid_conf.resistance_target, enable_index,
+                pid_conf.kp, pid_conf.ki, pid_conf.kd
             );
             f_res = f_open(&fp, filename, FA_WRITE | FA_OPEN_APPEND);
             if (f_res != FR_OK) {
@@ -663,16 +642,18 @@ void task_datalogger(void *pvParameters) {
             f_close(&fp);
         }
         else if (sd_event.type == CONFIG_FILE) {
-            system_config_t * config = (system_config_t *) sd_event.data;
+            pid_config_t * config = (pid_config_t *) sd_event.data;
             f_res = f_open(&fp, "config.txt", FA_WRITE | FA_CREATE_ALWAYS);
             if (f_res != FR_OK) {
                 sd_mounted = false;
                 continue;
             }
-            snprintf(buffer, sizeof(buffer), "PID time: %05d;R Target: %d;R Step index: %02d\n",
+            snprintf(buffer, sizeof(buffer), "PID time: %05d;R Target: %d;Kp: %.2f;Ki: %.2f;Kd: %.2f\n",
                 config->pid_time_ms,
                 config->resistance_target,
-                config->r_index
+                config->kp,
+                config->ki,
+                config->kd
             );
             f_res = f_write(&fp, buffer, strlen(buffer), &bw);
             if (f_res != FR_OK) {
@@ -824,9 +805,9 @@ int main()
     );
 
     // Tarea para procesar comandos UART
-    // xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 2,
-    //     NULL, 1, NULL
-    // );
+    xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 2,
+        NULL, 1, NULL
+    );
 
     vTaskStartScheduler();
     while(true);
@@ -844,10 +825,9 @@ void uart_irq_handler() {
         if (ch == '\n' || ch == '\r') {
             rx_buffer[rx_index] = '\0'; // Terminar la cadena
             if (queue_uart_rx != NULL) {
-                // xQueueSendFromISR copia el contenido de rx_buffer hacia el almacenamiento interno de la cola
                 xQueueSendFromISR(queue_uart_rx, rx_buffer, &xHigherPriorityTaskWoken);
             }
-            rx_index = 0; // Reiniciar el indice para el siguiente comando
+            rx_index = 0;
         } else {
             if (rx_index < RX_BUFFER_SIZE - 1) {
                 rx_buffer[rx_index++] = ch; // Almacenar el caracter en el buffer
@@ -857,8 +837,8 @@ void uart_irq_handler() {
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void task_uart(void *pvParameters) {
-    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+void setup_uart() {
+        int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
     // Configurar la UART
     uart_init(UART_ID, UART_BAUD_RATE);
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
@@ -871,29 +851,6 @@ void task_uart(void *pvParameters) {
     uart_set_irq_enables(UART_ID, true, false);
     irq_set_exclusive_handler(UART_IRQ, uart_irq_handler);
     irq_set_enabled(UART_IRQ, true);
-
-    // Buffer temporal para recibir comandos desde la cola
-    char cmd_buf[RX_BUFFER_SIZE];
-    if (queue_uart_rx == NULL) {
-        printf("Error: La cola de UART RX no está inicializada.\n");
-        vTaskDelete(NULL);
-    }
-    if (uart_tx_mutex == NULL) {
-        printf("Error: El mutex de UART TX no está inicializado.\n");
-        vTaskDelete(NULL);
-    }
-    while (1) {
-        if (xQueueReceive(queue_uart_rx, cmd_buf, portMAX_DELAY) == pdTRUE) {
-            // Proteger escrituras por UART (respuesta/ack) con el mutex
-            if (xSemaphoreTake(uart_tx_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-                // process_command(cmd_buf);
-                uart_puts(UART_ID, "TX: ");
-                uart_puts(UART_ID, cmd_buf);
-                uart_putc(UART_ID, '\n');
-                xSemaphoreGive(uart_tx_mutex);
-            }
-        }
-    }
 }
 
 void btn_irq_handler(uint gpio, uint32_t events) {
@@ -1152,4 +1109,132 @@ void setup_pwm(uint8_t gpio) {
     pwm_set_wrap(slice, MAX_PWM_WRAP);
     pwm_set_gpio_level(gpio, 0);
     pwm_set_enabled(slice, true);
+}
+
+
+void task_uart(void *pvParameters) {
+    // Buffer temporal para recibir comandos desde la cola
+    char cmd_buf[RX_BUFFER_SIZE];
+    char uart_tx_buf[RX_BUFFER_SIZE];
+    char *token = NULL;
+
+    uint8_t command;
+    uint8_t var;
+    float aux_f;
+    uint16_t aux_i;
+    if (queue_uart_rx == NULL) {
+        printf("Error: La cola de UART RX no está inicializada.\n");
+        vTaskDelete(NULL);
+    }
+    if (uart_tx_mutex == NULL) {
+        printf("Error: El mutex de UART TX no está inicializado.\n");
+        vTaskDelete(NULL);
+    }
+    while (1) {
+        if (xQueueReceive(queue_uart_rx, cmd_buf, portMAX_DELAY) == pdTRUE) {
+            // Proteger escrituras por UART (respuesta/ack) con el mutex
+            if (xSemaphoreTake(uart_tx_mutex, portMAX_DELAY) == pdTRUE) {
+                token = strtok(cmd_buf, " ");
+                if (strcmp(token, "set") == 0) {
+                    command = CMD_SET;
+                } else if (strcmp(token, "get") == 0) {
+                    command = CMD_GET;
+                } else if (strcmp(token, "list") == 0) {
+                    command = CMD_LIST;
+                } else if(strcmp(token, "echo") == 0) {
+                    command = CMD_ECHO;
+                    uart_puts(UART_ID, "TX: ");
+                    uart_puts(UART_ID, cmd_buf);
+                    uart_putc(UART_ID, '\n');
+                    xSemaphoreGive(uart_tx_mutex);
+                    continue;
+                } else {
+                    uart_puts(UART_ID, "Error: Comando no reconocido\n");
+                    xSemaphoreGive(uart_tx_mutex);
+                    continue;
+                }
+                token = strtok(NULL, " \n\r\0");
+                for (int i = 0; i < sizeof(var_map) / sizeof(var_map[0]); i++) {
+                    if (strcmp(token, var_map[i].cmd) == 0) {
+                        var = var_map[i].var;
+                        break;
+                    }
+                }
+
+                if (command == CMD_SET) {
+                    token = strtok(NULL, " \n\r\0");
+                    switch (var) {
+                        case VAR_KP:
+                            aux_f = atof(token);
+                            if (aux_f <= 0) {
+                                uart_puts(UART_ID, "Error set: Kp no puede ser negativo o 0\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            pid_conf.kp = aux_f;
+                            limit_float(&pid_conf.kp, MAX_KP);
+                            break;
+                        case VAR_KI:
+                            aux_f = atof(token);
+                            if (aux_f <= 0) {
+                                uart_puts(UART_ID, "Error set: Ki no puede ser negativo o 0\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            pid_conf.ki = aux_f;
+                            limit_float(&pid_conf.ki, MAX_KI);
+                            break;
+                        case VAR_KD:
+                            aux_f = atof(token);
+                            if (aux_f <= 0) {
+                                uart_puts(UART_ID, "Error set: Kd no puede ser negativo o 0\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            pid_conf.kd = aux_f;
+                            limit_float(&pid_conf.kd, MAX_KD);
+                            break;
+                        case VAR_R_TARGET:
+                            aux_i = atoi(token);
+                            if (aux_i < MINIMUM_RESISTANCE || aux_i > MAXIMUM_RESISTANCE)
+                                uart_puts(UART_ID, "Error set: R Target fuera de rango\n");
+                            else
+                                pid_conf.resistance_target = aux_i;
+                            break;
+                        case VAR_TIME_TARGET:
+                            aux_i = atoi(token);
+                            if (aux_i < 0 || aux_i > MAX_TIME_TARGET)
+                                uart_puts(UART_ID, "Error set: PID Time invalido\n");
+                            else
+                                pid_conf.pid_time_ms = aux_i;
+                            break;
+                        // case VAR_KI_LIM:
+
+                        default:
+                            uart_puts(UART_ID, "Error set: Variable no reconocida\n");
+                            break;
+                    }
+                }
+                switch (var) {
+                    case VAR_KP:
+                        sprintf(uart_tx_buf, "Kp: %.2f\n", pid_conf.kp);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_KI:
+                        sprintf(uart_tx_buf, "Ki: %.2f\n", pid_conf.ki);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_KD:
+                        sprintf(uart_tx_buf, "Kd: %.2f\n", pid_conf.kd);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    default:
+                        uart_puts(UART_ID, "Error: Variable no reconocida\n");
+                        break;
+                }
+
+                xSemaphoreGive(uart_tx_mutex);
+            }
+        }
+    }
 }

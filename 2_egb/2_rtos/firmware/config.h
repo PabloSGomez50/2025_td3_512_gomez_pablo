@@ -2,15 +2,19 @@
 #define __FIRMWARE_CONFIG_H__
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "hardware/i2c.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
+#include "hardware/adc.h"
+#include "hardware/pwm.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
+
 #include "lcd.h"
 #include "ina219.h"
 #include "ds3231.h"
@@ -55,11 +59,14 @@
 #define MAX_CURRENT 0.270f
 #define MAX_VOLTAGE 12.0f
 
-#define Kp 8.2f
-#define Kd 0.032f
-#define Ki 0.035f
-#define MAX_INTEGRAL_VALUE 5.0f
-#define MAX_DERIVATIVE_VALUE 10.0f
+
+#define MAX_KP 20.0f
+#define MAX_KI 0.2f
+#define MAX_KD 0.2f
+#define MAX_INTEGRAL_VALUE 25.0f
+#define MAX_DERIVATIVE_VALUE 50.0f
+
+#define MAX_TIME_TARGET 60000 // 60 segundos
 
 #define CONTROLLER_REFRESH_MS 40
 #define SLEEP_INA219    30
@@ -136,11 +143,12 @@ typedef struct {
     menu_t menu;
     uint8_t index;
     bool fixed_index;
+    
+    float max_temperature;
+    float max_current;
+    float max_voltage;
 
-    uint16_t pid_time_ms;
     uint16_t pwm_value;
-  
-    uint16_t resistance_target;
     int16_t resistance_adj;
     uint8_t r_index;
 } system_config_t;
@@ -149,8 +157,11 @@ typedef struct {
     float kp;
     float ki;
     float kd;
-    uint16_t r_target;
-    uint16_t pid_time;
+
+    float ki_limit;
+    float kd_limit;
+    uint16_t pid_time_ms;
+    uint16_t resistance_target;
 } pid_config_t;
 
 typedef struct {
@@ -178,6 +189,63 @@ typedef struct {
 const char file_header[] = "Voltage;Current;PWM Value;Error;Integral;Derivative;R_Target;Temperature\n";
 const uint8_t R_STEPS[] = {1, 10, 50, 100, 250};
 
+typedef enum {
+    CMD_GET,
+    CMD_SET,
+    CMD_LIST,
+    CMD_ECHO
+} cmd_tipo_t;
+
+typedef enum {
+    VAR_KP,
+    VAR_KD,
+    VAR_KI,
+    VAR_R_TARGET,
+    VAR_TIME_TARGET,
+    VAR_KI_LIM,
+    VAR_KD_LIM,
+    // VAR_PID_TIME,
+    // VAR_INA_TIME,
+    VAR_MAX_TEMP,
+    VAR_MAX_CURRENT,
+    VAR_MAX_VOLTAGE,
+    GET_VOLT,
+    GET_CURRENT,
+    GET_TEMP,
+    GET_STATUS,
+    GET_PROTECTION,
+    GET_SD,
+} cmd_variable_t;
+
+typedef struct {
+    const char *cmd;
+    cmd_variable_t var;
+} var_map_t;
+
+
+const var_map_t var_map[] = {
+    {"status", GET_STATUS},
+    {"protection", GET_PROTECTION},
+    {"voltage", GET_VOLT},
+    {"current", GET_CURRENT},
+    {"temp", GET_TEMP},
+    {"sd_card", GET_SD},
+    {"kp", VAR_KP},
+    {"kd", VAR_KD},
+    {"ki", VAR_KI},
+    {"r_target", VAR_R_TARGET},
+    {"t_target", VAR_TIME_TARGET},
+    {"int_lim", VAR_KI_LIM},
+    {"der_lim", VAR_KD_LIM},
+    // {"pid_time", VAR_PID_TIME},
+    // {"ina_time", VAR_INA_TIME},
+    {"max_temp", VAR_MAX_TEMP},
+    {"max_current", VAR_MAX_CURRENT},
+    {"max_voltage", VAR_MAX_VOLTAGE}
+};
+
+
+
 void btn_irq_handler(uint gpio, uint32_t events);
 void task_encoder(void *pvParameters);
 void task_btn_pull_up(void *pvParameters);
@@ -187,12 +255,17 @@ void task_ina219(void *pvParameters);
 void task_lcd_display(void *pvParameters);
 void task_read_temp(void *pvParameters);
 void task_rtc(void *pvParameters);
+void task_uart(void *pvParameters);
 
 void task_btn_stop_pull_up(void *pvParameters);
 
+void setup_uart();
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
 void limit_float(float *value, float max);
 void wrap_index(uint8_t *index, uint8_t max_index, bool increment);
+
+// void proces_command(char *cmd);
+
 
 #endif // __FIRMWARE_CONFIG_H__
