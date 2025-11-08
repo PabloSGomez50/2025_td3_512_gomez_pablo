@@ -21,7 +21,7 @@ QueueHandle_t queue_uart_rx;
 SemaphoreHandle_t uart_tx_mutex;
 
 TaskHandle_t task_rtc_handle;
-TaskHandle_t task_pid_handle;
+TaskHandle_t task_pid_handle = NULL;
 
 uint8_t enable_index = 0;
 
@@ -149,15 +149,16 @@ void task_menu(void *pvParameters) {
 
         if (sys_conf.menu == MENU_TEST) {
             if (input_data.device == ENCODER) {
-                int16_t aux_wrap = (sys_conf.pwm_value + (input_data.increment ? 25 : -5));
+                int16_t aux_wrap = ((int16_t) sys_conf.pwm_value + (input_data.increment ? 25 : -5));
                 if (aux_wrap > MAX_PWM_DUTY) {
                     aux_wrap = MAX_PWM_DUTY;
                 }
                 if (aux_wrap < MIN_PWM_DUTY) {
-                    aux_wrap = MIN_PWM_DUTY;
+                    xSemaphoreGive(bin_btn_2);
+                } else {
+                    sys_conf.pwm_value = aux_wrap;
+                    pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
                 }
-                sys_conf.pwm_value = aux_wrap;
-                pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
             }
             continue;
         }
@@ -926,11 +927,21 @@ void task_btn_stop_pull_up(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
         // Accion al presionar el boton
         sys_conf.pwm_value = MIN_PWM_DUTY;
-        if (gpio_get(PID_ENABLE_PIN)) {
+        if (!gpio_get(PID_ENABLE_PIN) && (sys_conf.menu == MENU_PID || sys_conf.menu == MENU_TEST)) {
+            gpio_put(PID_ENABLE_PIN, true);
+            if( sys_conf.menu == MENU_PID ) {
+                xTaskCreate(
+                    task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+                    (void *)&pid_conf, 4, task_pid_handle
+                );
+            }
+        } else {
             gpio_put(PID_ENABLE_PIN, false);
             pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
-        } else {
-            gpio_put(PID_ENABLE_PIN, true);
+            if (task_pid_handle != NULL) {
+                vTaskDelete(task_pid_handle);
+                task_pid_handle = NULL;
+            }
         }
         // Espera a que se suelte el boton
         if (!gpio_get(btn_data->gpio)) {
