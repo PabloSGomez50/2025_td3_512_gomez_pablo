@@ -32,7 +32,8 @@ system_config_t sys_conf = {
     .menu = MENU_MAIN,
     .index = 0,
     .fixed_index = false,
-    .r_index = 1
+    .r_index = 1,
+    .pwm_value = 0
 };
 
 pid_config_t pid_conf = {
@@ -149,16 +150,16 @@ void task_menu(void *pvParameters) {
 
         if (sys_conf.menu == MENU_TEST) {
             if (input_data.device == ENCODER) {
-                int16_t aux_wrap = ((int16_t) sys_conf.pwm_value + (input_data.increment ? 25 : -5));
+                uint16_t aux_wrap = (sys_conf.pwm_value + (input_data.increment ? 25 : -5));
                 if (aux_wrap > MAX_PWM_DUTY) {
                     aux_wrap = MAX_PWM_DUTY;
                 }
                 if (aux_wrap < MIN_PWM_DUTY) {
-                    xSemaphoreGive(bin_btn_2);
-                } else {
-                    sys_conf.pwm_value = aux_wrap;
-                    pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
+                    gpio_put(PID_ENABLE_PIN, false);
                 }
+                sys_conf.pwm_value = aux_wrap;
+                pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
+                
             }
             continue;
         }
@@ -301,7 +302,7 @@ void task_lcd_display(void *pvParameters) {
                     snprintf(line1, max_format_chars, "Error: INA219");
                     snprintf(line2, max_format_chars, "No data");
                 } else {
-                    snprintf(line1, max_format_chars, "W:%4d|V:%04.1fv", sys_conf.pwm_value - MIN_PWM_DUTY, ina219_data.voltage_v);
+                    snprintf(line1, max_format_chars, "W:%4d|V:%04.1fv", sys_conf.pwm_value, ina219_data.voltage_v);
                     snprintf(line2, max_format_chars, "C:%s |I:%04.2fmA", gpio_get(PID_ENABLE_PIN) ? "ON " : "OFF", ina219_data.current_a * 1000);
                 }
 
@@ -806,9 +807,9 @@ int main()
     );
 
     // Tarea para procesar comandos UART
-    xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 2,
-        NULL, 1, NULL
-    );
+    // xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 4,
+    //     NULL, 1, NULL
+    // );
 
     vTaskStartScheduler();
     while(true);
@@ -839,7 +840,7 @@ void uart_irq_handler() {
 }
 
 void setup_uart() {
-        int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
     // Configurar la UART
     uart_init(UART_ID, UART_BAUD_RATE);
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
@@ -929,12 +930,12 @@ void task_btn_stop_pull_up(void *pvParameters) {
         sys_conf.pwm_value = MIN_PWM_DUTY;
         if (!gpio_get(PID_ENABLE_PIN) && (sys_conf.menu == MENU_PID || sys_conf.menu == MENU_TEST)) {
             gpio_put(PID_ENABLE_PIN, true);
-            if( sys_conf.menu == MENU_PID ) {
-                xTaskCreate(
-                    task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
-                    (void *)&pid_conf, 4, task_pid_handle
-                );
-            }
+            // if( sys_conf.menu == MENU_PID ) {
+            //     xTaskCreate(
+            //         task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+            //         (void *)&pid_conf, 4, &task_pid_handle
+            //     );
+            // }
         } else {
             gpio_put(PID_ENABLE_PIN, false);
             pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);

@@ -32,7 +32,7 @@
 // Botones y Encoder
 #define DEBOUNCE_TIME 50 // Tiempo de debounce en ms
 #define BTN_MENU_GPIO 2
-#define BTN_STOP_GPIO 4
+#define BTN_STOP_GPIO 5
 #define BTN_SWITCH_GPIO 13
 #define MAX_MENU_NUM 2
 
@@ -49,7 +49,7 @@
 
 #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
 // #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
-#define MIN_PWM_DUTY 20U
+#define MIN_PWM_DUTY 20
 
 #define PID_ENABLE_PIN 16
 #define PWM_PIN 17
@@ -72,7 +72,7 @@
 #define SLEEP_INA219    30
 #define SLEEP_TIME_LCD  350 // Tiempo de espera en ms para la LCD
 
-#define USE_SERIAL_LOGGER 0
+#define USE_SERIAL_LOGGER 1
 #define LOGGER_CHUNK_SIZE 100
 #define LOGGER_MIN_SEND 10
 
