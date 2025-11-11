@@ -41,22 +41,26 @@
 #define ENC_MAX_INDEX 2
 
 // Controlador PID y protecciones
-#define PWM_GAIN 1.372f
 #define MAX_PWM_WRAP 4096
-
-#define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN)
-#define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
-
-#define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
-// #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+#define MAX_PWM_DUTY 3600
 #define MIN_PWM_DUTY 20
+
+// #define PWM_GAIN 1.372f
+// #define MAX_PWM_VOUT (float) (3.7f / PWM_GAIN)
+// #define MIN_PWM_VOUT (float) (3.02f / PWM_GAIN)
+// #define MAX_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MAX_PWM_VOUT / 3.3f)
+// #define MIN_PWM_DUTY (uint16_t) (MAX_PWM_WRAP * MIN_PWM_VOUT / 3.3f)
+
 
 #define PID_ENABLE_PIN 16
 #define PWM_PIN 17
 #define ADC_DIODE_TEMP 0 // Pin 26
+#define MIN_TEMP 50.0f
 #define MAX_TEMP 130.0f
 #define INA219_MAX_CURRENT 0.38f
-#define MAX_CURRENT 0.270f
+#define MIN_CURRENT 0.50f
+#define MAX_CURRENT 0.550f
+#define MIN_VOLTAGE 3.0f
 #define MAX_VOLTAGE 12.0f
 
 
@@ -81,7 +85,7 @@
 #define UART_BAUD_RATE 115200
 #define UART_TX_PIN 0
 #define UART_RX_PIN 1
-#define RX_BUFFER_SIZE 64
+#define RX_BUFFER_SIZE 32
 
 typedef struct {
     uint16_t year;
@@ -121,6 +125,12 @@ typedef enum {
     MENU_PROTECCION = 6
 } menu_t;
 
+typedef enum {
+    OVER_VOLTAGE,
+    OVER_CURRENT,
+    OVER_TEMPERATURE
+} protection_t;
+
 typedef enum  {
     I2C_INA219,
     I2C_LCD,
@@ -144,7 +154,7 @@ typedef struct {
     uint8_t index;
     bool fixed_index;
     
-    float max_temperature;
+    float max_temp;
     float max_current;
     float max_voltage;
 
@@ -192,7 +202,6 @@ const uint8_t R_STEPS[] = {1, 10, 50, 100, 250};
 typedef enum {
     CMD_GET,
     CMD_SET,
-    CMD_LIST,
     CMD_ECHO
 } cmd_tipo_t;
 
@@ -225,7 +234,7 @@ typedef struct {
 
 const var_map_t var_map[] = {
     {"status", GET_STATUS},
-    {"protection", GET_PROTECTION},
+    {"protec", GET_PROTECTION},
     {"voltage", GET_VOLT},
     {"current", GET_CURRENT},
     {"temp", GET_TEMP},
@@ -258,6 +267,8 @@ void task_rtc(void *pvParameters);
 void task_uart(void *pvParameters);
 
 void task_btn_stop_pull_up(void *pvParameters);
+
+void uart_irq_handler(void);
 
 void setup_uart();
 void setup_pwm(uint8_t gpio);

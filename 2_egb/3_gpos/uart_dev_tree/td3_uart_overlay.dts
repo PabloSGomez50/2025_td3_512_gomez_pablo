@@ -1,13 +1,15 @@
 /dts-v1/;
 /plugin/;
-/ {
+
+/{
 	compatible = "brcm,bcm2712";
+
 	fragment@0 {
 		target = <&uart0>;
 		__overlay__ {
-			td3_uart {
-				compatible = "brightlight,td3_uart";
-				status = "okay";
+			status = "okay";
+			egb_uart: egb_uart {
+				compatible = "PabloG,egb";
 			};
 		};
 	};

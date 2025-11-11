@@ -35,6 +35,10 @@ insmod:
 rmmod:
 	@sudo rmmod ${FILE}
 
+# Muestra los mensajes del kernel que imprimio este modulo
+dmesg:
+	@dmesg -T | grep ${AUTHOR}
+
 help:
 	@echo "all: Compila el modulo del kernel desarrollado (por defecto)"
 	@echo "clean: Limpia los resultados de la compilacion"

@@ -33,7 +33,10 @@ system_config_t sys_conf = {
     .index = 0,
     .fixed_index = false,
     .r_index = 1,
-    .pwm_value = 0
+    .pwm_value = 0,
+    .max_temp = MAX_TEMP,
+    .max_current = MAX_CURRENT,
+    .max_voltage = MAX_VOLTAGE
 };
 
 pid_config_t pid_conf = {
@@ -50,6 +53,7 @@ pid_config_t pid_conf = {
 void task_menu(void *pvParameters) {
     input_data_t input_data = {0};
     time_t edit_time = {0};
+    uint16_t aux_wrap = 0;
 
     i2c_guard_t guard_data = {0};
 
@@ -150,7 +154,11 @@ void task_menu(void *pvParameters) {
 
         if (sys_conf.menu == MENU_TEST) {
             if (input_data.device == ENCODER) {
-                uint16_t aux_wrap = (sys_conf.pwm_value + (input_data.increment ? 25 : -5));
+                if (input_data.increment) {
+                    aux_wrap = sys_conf.pwm_value + 25;
+                } else {
+                    aux_wrap = sys_conf.pwm_value > 5 ? sys_conf.pwm_value - 5 : 0;
+                }
                 if (aux_wrap > MAX_PWM_DUTY) {
                     aux_wrap = MAX_PWM_DUTY;
                 }
@@ -286,7 +294,7 @@ void task_lcd_display(void *pvParameters) {
                 );
                 if (sys_conf.index == 0) {
                     snprintf(line2, max_format_chars, "W:%4d|I:%5.1fmA",
-                        sys_conf.pwm_value - MIN_PWM_DUTY,
+                        sys_conf.pwm_value,
                         1000.0f * ina219_data.current_a
                     );
                 } else {
@@ -339,11 +347,11 @@ void task_lcd_display(void *pvParameters) {
             case MENU_PROTECCION:
                 snprintf(line1, max_format_chars, "Protection activada");
                 if (sys_conf.index == 0) {
-                    snprintf(line2, max_format_chars, "V >= %4.2fV", MAX_VOLTAGE);
+                    snprintf(line2, max_format_chars, "V >= %4.2fV", sys_conf.max_voltage);
                 } else if (sys_conf.index == 1) {
-                    snprintf(line2, max_format_chars, "I >= %5.1fmA", MAX_CURRENT);
+                    snprintf(line2, max_format_chars, "I >= %5.1fmA", sys_conf.max_current);
                 } else {
-                    snprintf(line2, max_format_chars, "Temp >= %5.2fC", MAX_TEMP);
+                    snprintf(line2, max_format_chars, "Temp >= %5.2fC", sys_conf.max_temp);
                 }
                 
                 break;
@@ -489,13 +497,13 @@ void task_protection(void * pvParameters) {
     while(1) {
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
         // xQueuePeek(queue_temp, &temp, portMAX_DELAY);
-        if (ina219_data.voltage_v >= MAX_VOLTAGE || ina219_data.current_a >= MAX_CURRENT || temp >= MAX_TEMP) {
+        if (ina219_data.voltage_v >= sys_conf.max_voltage || ina219_data.current_a >= sys_conf.max_current || temp >= sys_conf.max_temp) {
             pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY);
             gpio_put(PID_ENABLE_PIN, false);
             sys_conf.menu = MENU_PROTECCION;
-            if (ina219_data.voltage_v >= MAX_VOLTAGE) {
+            if (ina219_data.voltage_v >= sys_conf.max_voltage) {
                 sys_conf.index = 0;
-            } else if (ina219_data.current_a >= MAX_CURRENT) {
+            } else if (ina219_data.current_a >= sys_conf.max_current) {
                 sys_conf.index = 1;
             } else {
                 sys_conf.index = 2;
@@ -707,7 +715,7 @@ int main()
         return -1;
     }
     // Cola y mutex para manejo de UART
-    queue_uart_rx = xQueueCreate(5, RX_BUFFER_SIZE);
+    queue_uart_rx = xQueueCreate(RX_BUFFER_SIZE, sizeof(char));
     if (queue_uart_rx == NULL) {
         printf("Error al crear la cola UART RX\n");
         return -1;
@@ -753,6 +761,9 @@ int main()
     gpio_init(PID_ENABLE_PIN);
     gpio_set_dir(PID_ENABLE_PIN, GPIO_OUT);
     gpio_put(PID_ENABLE_PIN, 0);
+
+    
+    setup_uart();
 
     // Creacion de tareas
     xTaskCreate(
@@ -805,55 +816,14 @@ int main()
     xTaskCreate(task_rtc, "task_rtc", configMINIMAL_STACK_SIZE * 1,
         NULL, 1, &task_rtc_handle
     );
-
-    // Tarea para procesar comandos UART
-    // xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 4,
-    //     NULL, 1, NULL
-    // );
-
+    xTaskCreate(task_uart, "task_usart", configMINIMAL_STACK_SIZE * 5,
+        NULL, 1, NULL
+    );
     vTaskStartScheduler();
     while(true);
 }
 
 
-void uart_irq_handler() {
-    static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    static char rx_buffer[RX_BUFFER_SIZE];
-    static size_t rx_index = 0;
-    // Leer todos los bytes disponibles
-    while (uart_is_readable(UART_ID)) {
-        uint8_t ch = uart_getc(UART_ID);
-        // Si es fin de linea, terminar string y encolar para que la tarea la procese
-        if (ch == '\n' || ch == '\r') {
-            rx_buffer[rx_index] = '\0'; // Terminar la cadena
-            if (queue_uart_rx != NULL) {
-                xQueueSendFromISR(queue_uart_rx, rx_buffer, &xHigherPriorityTaskWoken);
-            }
-            rx_index = 0;
-        } else {
-            if (rx_index < RX_BUFFER_SIZE - 1) {
-                rx_buffer[rx_index++] = ch; // Almacenar el caracter en el buffer
-            }
-        }
-    }
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-void setup_uart() {
-    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
-    // Configurar la UART
-    uart_init(UART_ID, UART_BAUD_RATE);
-    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-    uart_set_hw_flow(UART_ID, false, false);
-
-    uart_set_fifo_enabled(UART_ID, false);
-
-    // Habilitar interrupciones de la UART (la ISR encola líneas completas)
-    uart_set_irq_enables(UART_ID, true, false);
-    irq_set_exclusive_handler(UART_IRQ, uart_irq_handler);
-    irq_set_enabled(UART_IRQ, true);
-}
 
 void btn_irq_handler(uint gpio, uint32_t events) {
     static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -969,6 +939,7 @@ void task_btn_pull_up(void *pvParameters) {
         xSemaphoreTake(*btn_data->sem_bin, portMAX_DELAY);
         // *btn_data->counter = (*btn_data->counter + 1) % btn_data->max_counter;
         vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
+        printf("Button %d pressed\n", btn_data->device);
 
         if (!gpio_get(btn_data->gpio)) {
             gpio_set_irq_enabled(btn_data->gpio, GPIO_IRQ_EDGE_RISE, true);
@@ -1124,9 +1095,38 @@ void setup_pwm(uint8_t gpio) {
 }
 
 
+
+void uart_irq_handler() {
+    static BaseType_t to_high_priority = pdFALSE;
+    static char c;
+    // Leer todos los bytes disponibles
+    while (uart_is_readable(UART_ID)) {
+        c = uart_getc(UART_ID);
+        xQueueSendFromISR(queue_uart_rx, &c, &to_high_priority);
+    }
+    portYIELD_FROM_ISR(to_high_priority);
+}
+
+void setup_uart() {
+    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+    // Configurar la UART
+    uart_init(UART_ID, UART_BAUD_RATE);
+    gpio_set_function(UART_TX_PIN, UART_FUNCSEL_NUM(UART_ID, UART_TX_PIN));
+    gpio_set_function(UART_RX_PIN, UART_FUNCSEL_NUM(UART_ID, UART_RX_PIN));
+    uart_set_hw_flow(UART_ID, false, false);
+    uart_set_format(UART_ID, 8, 1, UART_PARITY_NONE);
+    uart_set_fifo_enabled(UART_ID, true);
+
+    // Habilitar interrupciones de la UART (la ISR encola líneas completas)
+    irq_set_exclusive_handler(UART_IRQ, uart_irq_handler);
+    irq_set_enabled(UART_IRQ, true);
+    uart_set_irq_enables(UART_ID, true, false);
+}
+
 void task_uart(void *pvParameters) {
     // Buffer temporal para recibir comandos desde la cola
     char cmd_buf[RX_BUFFER_SIZE];
+    uint8_t cmd_idx = 0;
     char uart_tx_buf[RX_BUFFER_SIZE];
     char *token = NULL;
 
@@ -1134,30 +1134,33 @@ void task_uart(void *pvParameters) {
     uint8_t var;
     float aux_f;
     uint16_t aux_i;
-    if (queue_uart_rx == NULL) {
-        printf("Error: La cola de UART RX no está inicializada.\n");
-        vTaskDelete(NULL);
-    }
-    if (uart_tx_mutex == NULL) {
-        printf("Error: El mutex de UART TX no está inicializado.\n");
-        vTaskDelete(NULL);
-    }
+
+    ina219_data_t ina219_data;
+    float temp = 25.0f;
+
+    char c;
+
     while (1) {
-        if (xQueueReceive(queue_uart_rx, cmd_buf, portMAX_DELAY) == pdTRUE) {
+        xQueueReceive(queue_uart_rx, &c, portMAX_DELAY);
+        if (cmd_idx == 0 && c != '$') {
+            continue; // Ignorar hasta encontrar el inicio del comando
+        }
+        cmd_buf[cmd_idx++] = c;
+        if (cmd_buf[cmd_idx - 1] == '\n' || cmd_buf[cmd_idx - 1] == '\r' || cmd_idx >= RX_BUFFER_SIZE) {
+            cmd_buf[cmd_idx - 1] = '\0'; // Termina la cadena
+            cmd_idx = 0;
             // Proteger escrituras por UART (respuesta/ack) con el mutex
             if (xSemaphoreTake(uart_tx_mutex, portMAX_DELAY) == pdTRUE) {
                 token = strtok(cmd_buf, " ");
-                if (strcmp(token, "set") == 0) {
+                if (strcmp(token, "$set") == 0) {
                     command = CMD_SET;
-                } else if (strcmp(token, "get") == 0) {
+                } else if (strcmp(token, "$get") == 0) {
                     command = CMD_GET;
-                } else if (strcmp(token, "list") == 0) {
-                    command = CMD_LIST;
-                } else if(strcmp(token, "echo") == 0) {
+                } else if(strcmp(token, "$echo") == 0) {
+                    printf("Comando ECHO recibido\n");
                     command = CMD_ECHO;
                     uart_puts(UART_ID, "TX: ");
-                    uart_puts(UART_ID, cmd_buf);
-                    uart_putc(UART_ID, '\n');
+                    uart_puts(UART_ID, cmd_buf + 6);
                     xSemaphoreGive(uart_tx_mutex);
                     continue;
                 } else {
@@ -1208,20 +1211,70 @@ void task_uart(void *pvParameters) {
                             break;
                         case VAR_R_TARGET:
                             aux_i = atoi(token);
-                            if (aux_i < MINIMUM_RESISTANCE || aux_i > MAXIMUM_RESISTANCE)
+                            if (aux_i < MINIMUM_RESISTANCE || aux_i > MAXIMUM_RESISTANCE) {
                                 uart_puts(UART_ID, "Error set: R Target fuera de rango\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
                             else
                                 pid_conf.resistance_target = aux_i;
                             break;
                         case VAR_TIME_TARGET:
                             aux_i = atoi(token);
-                            if (aux_i < 0 || aux_i > MAX_TIME_TARGET)
+                            if (aux_i < 0 || aux_i > MAX_TIME_TARGET) {
                                 uart_puts(UART_ID, "Error set: PID Time invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
                             else
                                 pid_conf.pid_time_ms = aux_i;
                             break;
-                        // case VAR_KI_LIM:
-
+                        case VAR_KI_LIM:
+                            aux_f = atof(token);
+                            if (aux_f < 0 || aux_f > MAX_INTEGRAL_VALUE) {
+                                uart_puts(UART_ID, "Error set: Ki Limit invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            pid_conf.ki_limit = (float) aux_f;
+                            break;
+                        case VAR_KD_LIM:
+                            aux_f = atof(token);
+                            if (aux_f < 0 || aux_f > MAX_DERIVATIVE_VALUE) {
+                                uart_puts(UART_ID, "Error set: Kd Limit invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            pid_conf.kd_limit = (float) aux_f;
+                            break;
+                        case VAR_MAX_TEMP:
+                            aux_f = atof(token);
+                            if (aux_f < MIN_TEMP || aux_f > MAX_TEMP) {
+                                uart_puts(UART_ID, "Error set: Max Temp invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            sys_conf.max_temp = aux_f;
+                            break;
+                        
+                        case VAR_MAX_VOLTAGE:
+                            aux_f = atof(token);
+                            if (aux_f < MIN_VOLTAGE ||  aux_f > MAX_VOLTAGE) {
+                                uart_puts(UART_ID, "Error set: Max Voltage invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            sys_conf.max_voltage = aux_f;
+                            break;
+                        case VAR_MAX_CURRENT:
+                            aux_f = atof(token);
+                            if (aux_f < MIN_CURRENT || aux_f > MAX_CURRENT) {
+                                uart_puts(UART_ID, "Error set: Max Current invalido\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            sys_conf.max_current = aux_f;
+                            break;
                         default:
                             uart_puts(UART_ID, "Error set: Variable no reconocida\n");
                             break;
@@ -1239,6 +1292,73 @@ void task_uart(void *pvParameters) {
                     case VAR_KD:
                         sprintf(uart_tx_buf, "Kd: %.2f\n", pid_conf.kd);
                         uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_R_TARGET:
+                        sprintf(uart_tx_buf, "R_Target: %d\n", pid_conf.resistance_target);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_TIME_TARGET:
+                        sprintf(uart_tx_buf, "PID_Time: %d\n", pid_conf.pid_time_ms);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_KI_LIM:
+                        sprintf(uart_tx_buf, "Ki_Limit: %.2f\n", pid_conf.ki_limit);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_KD_LIM:
+                        sprintf(uart_tx_buf, "Kd_Limit: %.2f\n", pid_conf.kd_limit);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_MAX_TEMP:
+                        sprintf(uart_tx_buf, "Max_Temp: %.2f\n", sys_conf.max_temp);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_MAX_VOLTAGE:
+                        sprintf(uart_tx_buf, "Max_Voltage: %.2f\n", sys_conf.max_voltage);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case VAR_MAX_CURRENT:
+                        sprintf(uart_tx_buf, "Max_Current: %.2f\n", sys_conf.max_current);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case GET_VOLT:
+                        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
+                        sprintf(uart_tx_buf, "Voltage: %.2f V\n", ina219_data.voltage_v);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case GET_CURRENT:
+                        xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
+                        sprintf(uart_tx_buf, "Current: %.2f mA\n", ina219_data.current_a * 1000);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case GET_TEMP:
+                        xQueuePeek(queue_temp, &temp, portMAX_DELAY);
+                        sprintf(uart_tx_buf, "Temperature: %.2f C\n", temp);
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    case GET_SD:
+                        sprintf(uart_tx_buf, "SD_Card: %s\n", USE_SERIAL_LOGGER ? "Serial Logger" : "Datalogger");
+                        uart_puts(UART_ID, uart_tx_buf);
+                        break;
+                    // case GET_STATUS:
+                    // uart_puts(UART_ID, "Status: running\n");
+                    // break;
+                    case GET_PROTECTION:
+                        if (sys_conf.menu != MENU_PROTECCION) {
+                            uart_puts(UART_ID, "Protection: running\n");
+                        } else {
+                            switch (sys_conf.index) {
+                                case OVER_VOLTAGE:
+                                    uart_puts(UART_ID, "Protection: Over Voltage\n");
+                                    break;
+                                case OVER_CURRENT:
+                                    uart_puts(UART_ID, "Protection: Over Current\n");
+                                    break;
+                                case OVER_TEMPERATURE:
+                                    uart_puts(UART_ID, "Protection: Over Temperature\n");
+                                    break;
+                            }
+                        }
                         break;
                     default:
                         uart_puts(UART_ID, "Error: Variable no reconocida\n");
