@@ -42,7 +42,7 @@
 
 // Controlador PID y protecciones
 #define MAX_PWM_WRAP 4096
-#define MAX_PWM_DUTY 3600
+#define MAX_PWM_DUTY 4095
 #define MIN_PWM_DUTY 20
 
 // #define PWM_GAIN 1.372f
@@ -59,13 +59,13 @@
 #define MAX_TEMP 130.0f
 #define INA219_MAX_CURRENT 0.38f
 #define MIN_CURRENT 0.50f
-#define MAX_CURRENT 0.550f
+#define MAX_CURRENT 0.850f
 #define MIN_VOLTAGE 3.0f
 #define MAX_VOLTAGE 12.0f
 
 
 #define MAX_KP 20.0f
-#define MAX_KI 0.2f
+#define MAX_KI 0.5f
 #define MAX_KD 0.2f
 #define MAX_INTEGRAL_VALUE 25.0f
 #define MAX_DERIVATIVE_VALUE 50.0f
@@ -202,7 +202,8 @@ const uint8_t R_STEPS[] = {1, 10, 50, 100, 250};
 typedef enum {
     CMD_GET,
     CMD_SET,
-    CMD_ECHO
+    CMD_ECHO,
+    CMD_UNKNOWN
 } cmd_tipo_t;
 
 typedef enum {
@@ -218,12 +219,15 @@ typedef enum {
     VAR_MAX_TEMP,
     VAR_MAX_CURRENT,
     VAR_MAX_VOLTAGE,
+    VAR_DATE,
+    VAR_TIME,
     GET_VOLT,
     GET_CURRENT,
     GET_TEMP,
     GET_STATUS,
     GET_PROTECTION,
     GET_SD,
+    GET_UNKNOWN
 } cmd_variable_t;
 
 typedef struct {
@@ -250,7 +254,8 @@ const var_map_t var_map[] = {
     // {"ina_time", VAR_INA_TIME},
     {"max_temp", VAR_MAX_TEMP},
     {"max_current", VAR_MAX_CURRENT},
-    {"max_voltage", VAR_MAX_VOLTAGE}
+    {"max_voltage", VAR_MAX_VOLTAGE},
+    {""}
 };
 
 

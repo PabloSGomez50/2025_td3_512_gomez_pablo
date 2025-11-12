@@ -40,9 +40,12 @@ system_config_t sys_conf = {
 };
 
 pid_config_t pid_conf = {
-    .kp = 8.2f,
-    .ki = 0.032f,
-    .kd = 0.035f,
+    // .kp = 8.2f,
+    // .ki = 0.032f,
+    // .kd = 0.035f,
+    .kp = 3.0f,
+    .ki = 0.003f,
+    .kd = 0.02f,
     .ki_limit = 5.0f,
     .kd_limit = 10.0f,
     .pid_time_ms = 0,
@@ -411,14 +414,14 @@ void task_pid_controller(void *pid_params) {
     TickType_t ticks = xTaskGetTickCount();
     
     while(1) {
-        xQueuePeek(queue_temp, &temp, portMAX_DELAY);
+        xQueuePeek(queue_temp, &temp, 0);
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
 
         if (steps < target_steps) {
             r_target += pendiente;
             steps++;
         } else {
-            r_target = pid_conf.resistance_target;
+            r_target = params.resistance_target;
         }
         // if (r_target >= 1000) {
         //     kp = Kp * 2.0f;
@@ -435,7 +438,7 @@ void task_pid_controller(void *pid_params) {
 
         error = current_target_ma - (ina219_data.current_a * 1000.0f);
         if (fabsf(error / current_target_ma) <= 0.05f) {
-            integral_value += error * dt / params.ki;
+            integral_value += error * dt * params.ki;
             derivative_value = 0.0f;
             stable_steps++;
         } else {
@@ -450,7 +453,7 @@ void task_pid_controller(void *pid_params) {
         limit_float(&integral_value, params.ki_limit);
         limit_float(&derivative_value, params.kd_limit);
         int16_t delta_duty = (int16_t) (
-            pid_conf.kp * error +
+            params.kp * error +
             derivative_value +
             integral_value
         );
@@ -900,12 +903,12 @@ void task_btn_stop_pull_up(void *pvParameters) {
         sys_conf.pwm_value = MIN_PWM_DUTY;
         if (!gpio_get(PID_ENABLE_PIN) && (sys_conf.menu == MENU_PID || sys_conf.menu == MENU_TEST)) {
             gpio_put(PID_ENABLE_PIN, true);
-            // if( sys_conf.menu == MENU_PID ) {
-            //     xTaskCreate(
-            //         task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
-            //         (void *)&pid_conf, 4, &task_pid_handle
-            //     );
-            // }
+            if( sys_conf.menu == MENU_PID ) {
+                xTaskCreate(
+                    task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+                    (void *)&pid_conf, 4, &task_pid_handle
+                );
+            }
         } else {
             gpio_put(PID_ENABLE_PIN, false);
             pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
@@ -939,7 +942,6 @@ void task_btn_pull_up(void *pvParameters) {
         xSemaphoreTake(*btn_data->sem_bin, portMAX_DELAY);
         // *btn_data->counter = (*btn_data->counter + 1) % btn_data->max_counter;
         vTaskDelay(pdMS_TO_TICKS(DEBOUNCE_TIME));
-        printf("Button %d pressed\n", btn_data->device);
 
         if (!gpio_get(btn_data->gpio)) {
             gpio_set_irq_enabled(btn_data->gpio, GPIO_IRQ_EDGE_RISE, true);
@@ -1130,8 +1132,8 @@ void task_uart(void *pvParameters) {
     char uart_tx_buf[RX_BUFFER_SIZE];
     char *token = NULL;
 
-    uint8_t command;
-    uint8_t var;
+    uint8_t command = CMD_UNKNOWN;
+    uint8_t var = GET_UNKNOWN;
     float aux_f;
     uint16_t aux_i;
 
@@ -1186,6 +1188,11 @@ void task_uart(void *pvParameters) {
                                 xSemaphoreGive(uart_tx_mutex);
                                 continue;
                             }
+                            if (aux_f > MAX_KP) {
+                                uart_puts(UART_ID, "Warning set: Kp excede el maximo, se ajustara al limite\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
                             pid_conf.kp = aux_f;
                             limit_float(&pid_conf.kp, MAX_KP);
                             break;
@@ -1196,6 +1203,11 @@ void task_uart(void *pvParameters) {
                                 xSemaphoreGive(uart_tx_mutex);
                                 continue;
                             }
+                            if (aux_f > MAX_KI) {
+                                uart_puts(UART_ID, "Warning set: Ki excede el maximo, se ajustara al limite\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
                             pid_conf.ki = aux_f;
                             limit_float(&pid_conf.ki, MAX_KI);
                             break;
@@ -1203,6 +1215,11 @@ void task_uart(void *pvParameters) {
                             aux_f = atof(token);
                             if (aux_f <= 0) {
                                 uart_puts(UART_ID, "Error set: Kd no puede ser negativo o 0\n");
+                                xSemaphoreGive(uart_tx_mutex);
+                                continue;
+                            }
+                            if (aux_f > MAX_KD) {
+                                uart_puts(UART_ID, "Warning set: Kd excede el maximo, se ajustara al limite\n");
                                 xSemaphoreGive(uart_tx_mutex);
                                 continue;
                             }
@@ -1364,7 +1381,8 @@ void task_uart(void *pvParameters) {
                         uart_puts(UART_ID, "Error: Variable no reconocida\n");
                         break;
                 }
-
+                var = GET_UNKNOWN; // Reset variable
+                command = CMD_UNKNOWN; // Reset command
                 xSemaphoreGive(uart_tx_mutex);
             }
         }

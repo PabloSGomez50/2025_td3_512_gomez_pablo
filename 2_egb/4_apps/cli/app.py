@@ -1,6 +1,9 @@
-import os, re, sys, termios
+import os
+import re
+import sys
+import termios
 
-DEV_PATH = "/dev/PabloG_CE" # Definimos ubicacion del archivo
+DEV_PATH = "/dev/td3_egb" # Definimos ubicacion del archivo
 
 set_keys = {
     "PID Kp": "kp",
@@ -26,8 +29,6 @@ get_keys = {
 }
 
 def main():
-    menu = 0
-    msg = ""
     while True:
         match menu_principal():
             case "1":
@@ -45,10 +46,9 @@ def main():
                 print("1> Si")
                 print("2> No")
                 print("-------------------------------------------------")
-                match input("Opción [1-2]: ").strip():
-                    case "1":
-                        os.system("clear")
-                        break
+                if input("Opción [1-2]: ").strip() == "1":
+                    os.system("clear")
+                    break
             case _:
                 print("\nOpción invalida")
                 flush_stdin()
@@ -104,7 +104,7 @@ def menu_get():
     flush_stdin()
     opc = input(f"Opción [0-{len(get_keys)}]: ").strip()
     try:
-        msg += " " + get_keys[list(get_keys.keys())[int(opc)-1]]
+        msg = "$get " + get_keys[list(get_keys.keys())[int(opc)-1]]
     except KeyError:
         print("\nOpción invalida")
         flush_stdin()
@@ -121,8 +121,10 @@ def enviar_uart(msg):
         dev.write(msg + "\n")
     with open(DEV_PATH, "r") as dev:
         resp = dev.read().strip()
-    print(f"Respuesta: {rta}")
+    print(f"Respuesta: {resp}")
     print("-------------------------------------------------")
+    print("Presione tecla para continuar...")
+    input()
     return resp
 
 def flush_stdin():
