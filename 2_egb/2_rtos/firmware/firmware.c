@@ -591,26 +591,42 @@ void task_datalogger(void *pvParameters) {
         }
 
         xQueueReceive(queue_sd_card, &sd_event, portMAX_DELAY);
-        #if USE_SERIAL_LOGGER
-            if (sd_event.type != LOG_FILE) {
-                continue; // Solo procesar eventos de tipo LOG_FILE
+
+        if (sd_event.type == LOG_FILE) {
+            if (xSemaphoreTake(uart_tx_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                data_to_log = (datalogger_t *) sd_event.data;
+                for (uint8_t i = 0; i < sd_event.chunk_index; i++) {
+                    snprintf(buffer, sizeof(buffer),
+                        "D:%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d;%4.1f\n",
+                        data_to_log[i].voltage_v,
+                        data_to_log[i].current_ma,
+                        data_to_log[i].pwm_value,
+                        data_to_log[i].error,
+                        data_to_log[i].integral,
+                        data_to_log[i].derivative,
+                        data_to_log[i].r_target,
+                        data_to_log[i].temperature
+                    );
+                    uart_puts(UART_ID, buffer);
+                }
+                xSemaphoreGive(uart_tx_mutex);
             }
 
-            data_to_log = (datalogger_t *) sd_event.data;
-            for (uint8_t i = 0; i < sd_event.chunk_index; i++) {
-                printf("%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d;%4.1f\n",
-                    data_to_log[i].voltage_v,
-                    data_to_log[i].current_ma,
-                    data_to_log[i].pwm_value,
-                    data_to_log[i].error,
-                    data_to_log[i].integral,
-                    data_to_log[i].derivative,
-                    data_to_log[i].r_target,
-                    data_to_log[i].temperature
-                );
-            }
-        #else
-        if (sd_event.type == LOG_FILE) {
+            #if USE_SERIAL_LOGGER
+                data_to_log = (datalogger_t *) sd_event.data;
+                for (uint8_t i = 0; i < sd_event.chunk_index; i++) {
+                    printf("%.2f;%.2f;%04d;%.2f;%.2f;%.2f;%05d;%4.1f\n",
+                        data_to_log[i].voltage_v,
+                        data_to_log[i].current_ma,
+                        data_to_log[i].pwm_value,
+                        data_to_log[i].error,
+                        data_to_log[i].integral,
+                        data_to_log[i].derivative,
+                        data_to_log[i].r_target,
+                        data_to_log[i].temperature
+                    );
+                }
+            #else
             datalogger_t *data_to_log = (datalogger_t *) sd_event.data;
 
             xQueuePeek(queue_rtc_time, &current_time, portMAX_DELAY);
@@ -653,8 +669,10 @@ void task_datalogger(void *pvParameters) {
                 }
             }
             f_close(&fp);
+            #endif
         }
         else if (sd_event.type == CONFIG_FILE) {
+            #if !USE_SERIAL_LOGGER
             pid_config_t * config = (pid_config_t *) sd_event.data;
             f_res = f_open(&fp, "config.txt", FA_WRITE | FA_CREATE_ALWAYS);
             if (f_res != FR_OK) {
@@ -673,8 +691,8 @@ void task_datalogger(void *pvParameters) {
                 printf("Error writing to file: %d\n", f_res);
             }
             f_close(&fp);
+            #endif
         }
-        #endif
     }
 }
 
@@ -902,20 +920,9 @@ void task_btn_stop_pull_up(void *pvParameters) {
         // Accion al presionar el boton
         sys_conf.pwm_value = MIN_PWM_DUTY;
         if (!gpio_get(PID_ENABLE_PIN) && (sys_conf.menu == MENU_PID || sys_conf.menu == MENU_TEST)) {
-            gpio_put(PID_ENABLE_PIN, true);
-            if( sys_conf.menu == MENU_PID ) {
-                xTaskCreate(
-                    task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
-                    (void *)&pid_conf, 4, &task_pid_handle
-                );
-            }
+            start_pid();
         } else {
-            gpio_put(PID_ENABLE_PIN, false);
-            pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
-            if (task_pid_handle != NULL) {
-                vTaskDelete(task_pid_handle);
-                task_pid_handle = NULL;
-            }
+            stop_pid();
         }
         // Espera a que se suelte el boton
         if (!gpio_get(btn_data->gpio)) {
@@ -1046,6 +1053,34 @@ void task_rtc(void *pvParameters) {
     }
 }
 
+uint8_t start_pid() {
+    if (!gpio_get(PID_ENABLE_PIN)) {
+        gpio_put(PID_ENABLE_PIN, true);
+        if (sys_conf.menu == MENU_PID ) {
+            xTaskCreate(
+                task_pid_controller, "task_pid_controller", configMINIMAL_STACK_SIZE * 2,
+                (void *)&pid_conf, 4, &task_pid_handle
+            );
+        }
+        return 1;
+    }
+    return 0;
+}
+
+uint8_t stop_pid() {
+    if (gpio_get(PID_ENABLE_PIN)) {
+        gpio_put(PID_ENABLE_PIN, false);
+        pwm_set_gpio_level(PWM_PIN, sys_conf.pwm_value);
+        if (task_pid_handle != NULL) {
+            vTaskDelete(task_pid_handle);
+            task_pid_handle = NULL;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+
 void limit_float(float *value, float max) {
     if (*value > max) {
         *value = max;
@@ -1163,6 +1198,26 @@ void task_uart(void *pvParameters) {
                     command = CMD_ECHO;
                     uart_puts(UART_ID, "TX: ");
                     uart_puts(UART_ID, cmd_buf + 6);
+                    uart_puts(UART_ID, "\n");
+                    xSemaphoreGive(uart_tx_mutex);
+                    continue;
+                } else if(strcmp(token, "$start") == 0) {
+                    command = CMD_START;
+                    sys_conf.menu = MENU_PID;
+                    if (start_pid()) {
+                        uart_puts(UART_ID, "PID iniciado\n");
+                    } else {
+                        uart_puts(UART_ID, "PID ya estaba en ejecucion\n");
+                    }
+                    xSemaphoreGive(uart_tx_mutex);
+                    continue;
+                } else if(strcmp(token, "$stop") == 0) {
+                    command = CMD_STOP;
+                    if (stop_pid()) {
+                        uart_puts(UART_ID, "PID detenido\n");
+                    } else {
+                        uart_puts(UART_ID, "PID ya estaba detenido\n");
+                    }
                     xSemaphoreGive(uart_tx_mutex);
                     continue;
                 } else {

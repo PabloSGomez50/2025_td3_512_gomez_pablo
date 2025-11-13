@@ -203,6 +203,8 @@ typedef enum {
     CMD_GET,
     CMD_SET,
     CMD_ECHO,
+    CMD_START,
+    CMD_STOP,
     CMD_UNKNOWN
 } cmd_tipo_t;
 
@@ -275,6 +277,8 @@ void task_btn_stop_pull_up(void *pvParameters);
 
 void uart_irq_handler(void);
 
+uint8_t start_pid();
+uint8_t stop_pid();
 void setup_uart();
 void setup_pwm(uint8_t gpio);
 void set_lcd_text(void *text);
