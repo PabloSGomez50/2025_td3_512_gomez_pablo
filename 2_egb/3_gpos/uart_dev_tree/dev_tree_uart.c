@@ -181,18 +181,19 @@ static ssize_t chr_dev_read(struct file *f, char __user *buff, size_t size, loff
     spin_lock_irqsave(lock, flags);
     list_for_each_entry_safe(msg, tmp, list, list) {
         size_t remain = msg->len - msg->offset;
-        size_t to_copy = min(remain, total_copied < size ? size - total_copied : 0);
+        size_t avail = size - total_copied;
 
-        if (to_copy == 0) {
+        if (remain > avail) {
             if (total_copied == 0) {
-                to_copy = min(remain, size);
+                spin_unlock_irqrestore(lock, flags);
+                return 0;
             } else {
                 break;
             }
         }
 
         spin_unlock_irqrestore(lock, flags);
-        if (copy_to_user(buff + total_copied, msg->data + msg->offset, to_copy)) {
+        if (copy_to_user(buff + total_copied, msg->data + msg->offset, remain)) {
             spin_lock_irqsave(lock, flags);
             if (total_copied == 0)
                 return -EFAULT;
@@ -200,8 +201,8 @@ static ssize_t chr_dev_read(struct file *f, char __user *buff, size_t size, loff
         }
         spin_lock_irqsave(lock, flags);
 
-        msg->offset += to_copy;
-        total_copied += to_copy;
+        msg->offset += remain;
+        total_copied += remain;
 
         if (msg->offset >= msg->len) {
             list_del(&msg->list);
