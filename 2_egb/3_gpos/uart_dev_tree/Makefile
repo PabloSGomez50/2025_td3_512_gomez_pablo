@@ -1,5 +1,6 @@
 FILE := dev_tree_uart
 DEV_TREE := td3_uart_overlay
+AUTHOR := PabloG_CE
 
 KDIR := /lib/modules/$(shell uname -r)/build
 MDIR := $(PWD)/build
@@ -30,7 +31,8 @@ unload-devtree:
 
 insmod:
 	@sudo insmod build/${FILE}.ko
-	@sudo chmod 666 /dev/td3_uart
+	@sudo chmod 666 /dev/egb_commands
+	@sudo chmod 666 /dev/egb_data
 
 rmmod:
 	@sudo rmmod ${FILE}
