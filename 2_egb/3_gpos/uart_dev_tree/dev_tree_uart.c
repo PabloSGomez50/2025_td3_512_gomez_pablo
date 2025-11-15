@@ -284,7 +284,7 @@ static size_t egb_uart_recv(struct serdev_device *serdev, const unsigned char *b
         if (c == '\n') {
             struct uart_msg *m;
             size_t len = uart_buff_index;
-            if (len == 0) {
+            if (len < 2) {
                 continue;
             }
 

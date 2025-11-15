@@ -44,7 +44,7 @@ pid_config_t pid_conf = {
     // .ki = 0.032f,
     // .kd = 0.035f,
     .kp = 3.0f,
-    .ki = 0.003f,
+    .ki = 0.1f,
     .kd = 0.02f,
     .ki_limit = 5.0f,
     .kd_limit = 10.0f,
@@ -499,7 +499,7 @@ void task_protection(void * pvParameters) {
 
     while(1) {
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
-        // xQueuePeek(queue_temp, &temp, portMAX_DELAY);
+        xQueuePeek(queue_temp, &temp, portMAX_DELAY);
         if (ina219_data.voltage_v >= sys_conf.max_voltage || ina219_data.current_a >= sys_conf.max_current || temp >= sys_conf.max_temp) {
             pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY);
             gpio_put(PID_ENABLE_PIN, false);

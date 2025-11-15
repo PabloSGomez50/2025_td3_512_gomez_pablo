@@ -3,7 +3,7 @@ import csv
 from datetime import datetime
 
 # Configuración del puerto serie
-PUERTO = 'COM9'
+PUERTO = 'COM8'
 BAUDIOS = 115200          # Velocidad del microcontrolador
 
 # Nombre del archivo CSV con timestamp para no sobreescribir

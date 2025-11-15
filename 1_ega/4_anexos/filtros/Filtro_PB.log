@@ -1,11 +1,21 @@
-LTspice 24.0.12 for Windows
-Circuit: * C:\Users\PabloPC\Documents\Github\2025_td3_512_gomez_pablo\1_ega\4_anexos\filtros\Filtro_PB.asc
-Start Time: Mon Aug 25 12:31:43 2025
-solver = Normal
-Maximum thread count: 6
+Circuit: * C:\Users\pablo\Documents\Github\2025_td3_512_gomez_pablo\1_ega\4_anexos\filtros\Filtro_PB.asc
+
+Direct Newton iteration for .op point succeeded.
+
+Date: Thu Nov 13 18:12:40 2025
+Total elapsed time: 1.241 seconds.
+
 tnom = 27
 temp = 27
 method = modified trap
-Direct Newton iteration for .op point succeeded.
-Total elapsed time: 1.461 seconds.
+totiter = 74131
+traniter = 74126
+tranpoints = 35694
+accept = 34400
+rejected = 1294
+matrix size = 62
+fillins = 8
+solver = Normal
+Matrix Compiler1:     228 opcodes  1.3/[0.4]/0.9
+Matrix Compiler2: 4.77 KB object code size  0.4/0.6/[0.3]
 
