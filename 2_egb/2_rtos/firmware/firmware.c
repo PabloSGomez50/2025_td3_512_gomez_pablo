@@ -501,8 +501,7 @@ void task_protection(void * pvParameters) {
         xQueuePeek(queue_ina219_data, &ina219_data, portMAX_DELAY);
         xQueuePeek(queue_temp, &temp, portMAX_DELAY);
         if (ina219_data.voltage_v >= sys_conf.max_voltage || ina219_data.current_a >= sys_conf.max_current || temp >= sys_conf.max_temp) {
-            pwm_set_gpio_level(PWM_PIN, MIN_PWM_DUTY);
-            gpio_put(PID_ENABLE_PIN, false);
+            stop_pid();
             sys_conf.menu = MENU_PROTECCION;
             if (ina219_data.voltage_v >= sys_conf.max_voltage) {
                 sys_conf.index = 0;
@@ -837,7 +836,7 @@ int main()
     xTaskCreate(task_rtc, "task_rtc", configMINIMAL_STACK_SIZE * 1,
         NULL, 1, &task_rtc_handle
     );
-    xTaskCreate(task_uart, "task_usart", configMINIMAL_STACK_SIZE * 5,
+    xTaskCreate(task_uart, "task_uart", configMINIMAL_STACK_SIZE * 5,
         NULL, 1, NULL
     );
     vTaskStartScheduler();
