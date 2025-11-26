@@ -1,0 +1,1 @@
+from td3_egb.dependencies.dev_data_reader import DeviceReader, DevReaderInst
