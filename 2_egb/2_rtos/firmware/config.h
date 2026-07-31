@@ -57,8 +57,9 @@
 #define ADC_DIODE_TEMP 0 // Pin 26
 #define MIN_TEMP 50.0f
 #define MAX_TEMP 130.0f
-#define INA219_MAX_CURRENT 0.38f
-#define MIN_CURRENT 0.50f
+#define INA219_MAX_CURRENT 1.5f
+#define INA219_GAIN_SELECTED INA219_GAIN_4_160MV
+#define MIN_CURRENT 0.10f
 #define MAX_CURRENT 0.850f
 #define MIN_VOLTAGE 3.0f
 #define MAX_VOLTAGE 12.0f
@@ -67,8 +68,8 @@
 #define MAX_KP 20.0f
 #define MAX_KI 0.5f
 #define MAX_KD 0.2f
-#define MAX_INTEGRAL_VALUE 25.0f
-#define MAX_DERIVATIVE_VALUE 50.0f
+#define MAX_INTEGRAL_VALUE 40.0f
+#define MAX_DERIVATIVE_VALUE 40.0f
 
 #define MAX_TIME_TARGET 60000 // 60 segundos
 

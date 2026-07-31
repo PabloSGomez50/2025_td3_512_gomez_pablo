@@ -43,13 +43,13 @@ pid_config_t pid_conf = {
     // .kp = 8.2f,
     // .ki = 0.032f,
     // .kd = 0.035f,
-    .kp = 3.0f,
-    .ki = 0.1f,
+    .kp = 3.5f,
+    .ki = 5.5f,
     .kd = 0.02f,
-    .ki_limit = 5.0f,
+    .ki_limit = 10.0f,
     .kd_limit = 10.0f,
     .pid_time_ms = 0,
-    .resistance_target = 300
+    .resistance_target = 100
 };
 
 
@@ -998,7 +998,7 @@ void task_ina219(void *pvParameters) {
     ina219.i2c = I2C_PORT;
     ina219.max_expected_amps = INA219_MAX_CURRENT;
     ina219.shunt_resistor_value = 0.1f;
-    ina219.gain = INA219_GAIN_2_80MV;
+    ina219.gain = INA219_GAIN_SELECTED;
 
     ina219_data_t ina219_data = {0};
     ina219_context_t context = {

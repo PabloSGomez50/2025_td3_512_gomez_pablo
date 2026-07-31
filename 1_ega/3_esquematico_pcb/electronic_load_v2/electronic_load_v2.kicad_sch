@@ -9584,7 +9584,7 @@
 				)
 			)
 		)
-		(property "Value" "4.7k"
+		(property "Value" "47k"
 			(at 224.79 29.21 90)
 			(effects
 				(font
@@ -12733,7 +12733,7 @@
 				)
 			)
 		)
-		(property "Value" "4.7k"
+		(property "Value" "47k"
 			(at 214.63 29.21 90)
 			(effects
 				(font
@@ -13772,7 +13772,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "100nF"
+		(property "Value" "10nF"
 			(at 237.7441 17.78 90)
 			(effects
 				(font
@@ -14532,7 +14532,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "47nF"
+		(property "Value" "4.7nF"
 			(at 226.06 38.0999 0)
 			(effects
 				(font
